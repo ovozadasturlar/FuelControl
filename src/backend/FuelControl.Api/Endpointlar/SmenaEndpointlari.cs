@@ -88,7 +88,7 @@ public static class SmenaEndpointlari
         }).RuxsatKerak(Ruxsat.SmenaOchish).Produces<SmenaDto>(201).ProducesProblem(409).ProducesProblem(400);
 
         // Operator faqat o'zi ochgan smenani yopadi ("Smenalar" ruxsati borlar - istalganini). Formula - Core.SmenaHisoblagich.
-        s.MapPost("/{id:int}/yop", async (int id, SmenaYopishDto so, HttpContext ctx, FuelControlDbContext db, IHubContext<SotuvHub> hub, UlanishlarXaritasi ulanishlar) =>
+        s.MapPost("/{id:int}/yop", async (int id, SmenaYopishDto so, HttpContext ctx, FuelControlDbContext db, IHubContext<SotuvHub> hub, UlanishlarXaritasi ulanishlar, ZaxiraNavbati zaxira) =>
         {
             var (dto, aparatlar) = await Tranzaksiya.Bajar(db, async () =>
             {
@@ -112,6 +112,7 @@ public static class SmenaEndpointlari
             await ulanishlar.YopilganSmena(dto);                       // to'liq natija faqat Smenalar ruxsatlilarga va egasiga (docs 8.10)
             foreach (var a in aparatlar) await hub.Kuzatuvchilarga(Xabarlar.AparatOzgardi, a);
             await hub.Bildir(Bolimlar.Harakatlar);
+            zaxira.SmenaYopildi(id);                                   // zaxira nusxa fonda (docs 8.17): yopishni sekinlashtirmaydi va buzmaydi
             return Results.Ok(dto);
         }).RuxsatKerak(Ruxsat.SmenaYopish).Produces<SmenaDto>().ProducesProblem(400).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
 

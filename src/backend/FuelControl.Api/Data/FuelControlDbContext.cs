@@ -63,6 +63,7 @@ public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> 
     public DbSet<BakTuzatishi> BakTuzatishlari => Set<BakTuzatishi>();
     public DbSet<HisobHarakati> Harakatlar => Set<HisobHarakati>();
     public DbSet<AuditYozuvi> Audit => Set<AuditYozuvi>();
+    public DbSet<ZaxiraSozlamasi> ZaxiraSozlamalari => Set<ZaxiraSozlamasi>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -94,6 +95,9 @@ public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> 
         });
 
         m.Entity<YoqilgiTuri>(e => e.HasIndex(x => x.Nomi).IsUnique());
+
+        // Bitta qator (Id = 1): zaxira va Telegram sozlamalari; birinchi saqlashda yaratiladi.
+        m.Entity<ZaxiraSozlamasi>(e => e.Property(x => x.Id).ValueGeneratedNever());
 
         m.Entity<NarxTarixi>(e => e.HasIndex(x => x.Vaqt));
 

@@ -427,6 +427,37 @@ Olib tashlanadi: barcha `/sotuvlar` yo'llari. `/operatorlar/{id}/hisob` saqlanad
      - Klientlar: o'girish va krug aniqlash testlari, yuqoridagi misollar, `p ≥ H` xatosi, tasdiq dialoglari tartibi va skrinshotlar.
      - Installer e2e 0.1.3 → 0.1.4: ustun qo'shiladi, barcha ma'lumotlar o'zgarishsiz qoladi. Keyin 5-aparatga krug yoqiladi va smena krug bilan yopiladi.
 
+17. **Zaxira nusxa: E:\baza, 30 ta fayl, smena yopilganda va Telegram'ga (2026-11-01).**
+   - **Muammo.** Zaxira `C:\ProgramData\FuelControl\zaxira` da turadi. Bu papka yashirin, shuning uchun foydalanuvchi uni topa olmadi. Hozir nusxa kuniga bir marta olinadi va 30 kundan eskilari o'chiriladi. Nusxa kompyuterdan tashqariga chiqmaydi.
+   - **Papka.** `Zaxira:Papka` sozlamasi o'zgarmaydi. Mijozda fc uni `appsettings.Local.json` orqali `E:\baza` qiladi.
+     - Papka mavjud bo'lmasa, yozib bo'lmasa yoki disk ulanmagan bo'lsa, nusxa standart papkaga (`zaxira`) olinadi.
+     - Bu holat logga va Sozlamalar → Zaxira nusxa'dagi holatga yoziladi. Zaxira hech qachon to'xtab qolmasligi kerak.
+   - **Saqlash.** Kun bo'yicha emas, son bo'yicha: eng yangi **30** ta `fuelcontrol-*.db` qoladi, eskilari o'chiriladi. Son `Zaxira:Saqlash` sozlamasidan olinadi, standarti 30.
+   - **Qachon olinadi** (2026-11-01, foydalanuvchi: "har smena yopilganda bo'ldi, ortiqcha kerak emas"):
+     - faqat har **smena yopilganda**: yopish javobidan keyin fon rejimida, yopishni sekinlashtirmaydi va xato bo'lsa ham yopishni buzmaydi;
+     - kunlik avtomatik nusxa **olib tashlanadi**;
+     - Sozlamalardagi "Hozir nusxa olish" tugmasi qoladi: u faqat qo'lda bosilganda ishlaydi.
+     - 30 ta nusxa taxminan 30 ta smenaga yetadi.
+   - **Telegram.** Har yangi nusxadan keyin fon rejimida Telegram'ga yuboriladi.
+     - Nusxa gzip qilinadi va Bot API `sendDocument` orqali yuboriladi. Izohda shoxobcha, sana, sabab (kunlik / smena #N yopildi / qo'lda) va hajm bo'ladi.
+     - Yuborilmasa (internet yo'q va h.k.), xato logga va holatga yoziladi. Nusxa keyingi safar qayta urinish bilan yuboriladi: oxirgi yuborilmagan nusxa ham ketadi.
+     - Bot API cheklovi 50 MB. Undan katta bo'lsa, yuborilmaydi va holatda ko'rinadi.
+     - Sozlamalar: bot tokeni va chat ID. Token serverda saqlanadi va klientga hech qachon to'liq qaytmaydi (faqat `…ab12` ko'rinishida). Token audit matniga ham, logga ham yozilmaydi. Qayerda saqlash (baza jadvali yoki ProgramData'dagi fayl) — backend taklif qiladi, migratsiya kerak bo'lsa shartnomani fc bilan kelishadi.
+     - Yoqilmagan (token yo'q) bo'lsa, hech narsa yuborilmaydi.
+   - **Sozlamalar → Zaxira nusxa** (desktop va web bir xil, `Sozlamalar` ruxsati):
+     - papka yo'li va standartga qaytgan bo'lsa ogohlantirish;
+     - oxirgi nusxalar ro'yxati (nomi, vaqti, hajmi, sababi);
+     - Telegram: token (maskalangan, yangisini kiritish mumkin), chat ID, "Yoqilgan" belgisi, **"Sinov yuborish"** tugmasi (kichik matnli xabar), oxirgi yuborish holati (vaqt, muvaffaqiyat/xato matni).
+     - Token o'zgarishi auditga yoziladi, tokenning o'zi yozilmaydi.
+   - **Testlar.**
+     - 31-nusxada eng eskisi o'chadi;
+     - papka mavjud bo'lmasa, nusxa standart papkaga tushadi;
+     - smena yopilgach nusxa olinadi;
+     - Telegram: soxta HTTP handler bilan muvaffaqiyat, xato, qayta urinish va 50 MB;
+     - token javobda va logda yo'q;
+     - ruxsatsiz 403.
+   - **Versiya 0.1.5.** Mijozda o'rnatilgach, fc `Zaxira:Papka = E:\baza` qiladi. Bot tokenini foydalanuvchi o'zi Sozlamalarga kiritadi (BotFather'da bot ochib, chat ID ni oladi).
+
 ## 9. Ish tartibi
 
 - Faqat o'z papkangizga tegasiz: backend `src/backend` + `tests`, web `src/frontend/web`, desktop `src/frontend/desktop`. `docs/` — faqat fc.

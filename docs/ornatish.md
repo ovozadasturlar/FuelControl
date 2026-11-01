@@ -17,7 +17,7 @@ Ma'lumotlar dastur papkasida **emas**, `%ProgramData%\FuelControl\` da (odatda `
 | Nima | Qayerda |
 |---|---|
 | Baza | `fuelcontrol.db` |
-| Zaxira nusxalar | `zaxira\fuelcontrol-YYYYMMDD-HHmmss.db` |
+| Zaxira nusxalar | `zaxira\fuelcontrol-YYYYMMDD-HHmmss-smena<N>.db` (papkani `Zaxira:Papka` o'zgartiradi, 7 va 9-bo'lim) |
 | Jurnallar | `logs\fuelcontrol-YYYYMMDD.log` |
 
 Bu papkaga faqat **Administrators** va **SYSTEM** kira oladi. Dasturni o'chirganda ham, yangilaganda ham u **o'chirilmaydi**.
@@ -96,6 +96,23 @@ Misol — web alohida domenda (Cloudflare Pages) turganda uning manzilini API'ga
 
 `Manbalar` bo'sh bo'lsa CORS umuman yoqilmaydi. Manzillar aniq bo'lishi kerak (`*` emas), oxirida `/` bo'lmasin (bo'lsa ham olib tashlanadi).
 
+Misol — zaxira nusxalarni topish oson papkaga (masalan, `E:\baza`) olish va Telegram izohida shoxobcha nomini ko'rsatish (9-bo'lim):
+
+```json
+{
+  "Zaxira": { "Papka": "E:\\baza", "Saqlash": 30, "Shoxobcha": "Chilonzor shoxobchasi" }
+}
+```
+
+JSON'da teskari chiziq ikkita yoziladi (`E:\\baza`). Zaxira kalitlari:
+
+| Kalit | Ma'nosi | Standarti |
+|---|---|---|
+| `Zaxira:Papka` | Nusxalar tushadigan papka. Yo'q bo'lsa (disk ulangan bo'lsa) yaratiladi | `%ProgramData%\FuelControl\zaxira` (o'rnatuvchi yozadi) |
+| `Zaxira:Saqlash` | Nechta eng yangi nusxa saqlanadi; eskilari o'chiriladi | `30` |
+| `Zaxira:StandartPapka` | `Papka` ga yozib bo'lmasa nusxa tushadigan papka | bazaning yonidagi `zaxira` (`%ProgramData%\FuelControl\zaxira`) |
+| `Zaxira:Shoxobcha` | Telegram izohidagi shoxobcha nomi | kompyuter nomi |
+
 ## 8. Yangilash
 
 Yangi `FuelControl-Setup-<versiya>.exe` ni o'sha kompyuterda shunchaki ishga tushiring (avval eskisini o'chirish shart emas):
@@ -105,11 +122,15 @@ Yangi `FuelControl-Setup-<versiya>.exe` ni o'sha kompyuterda shunchaki ishga tus
 - Port sahifasida oldingi port ko'rinadi; administrator paroli qayta so'ralmaydi (baza bor).
 - Desktop ochiq bo'lsa, o'rnatuvchi uni yopishni so'raydi.
 - Yangilashdan oldin zaxira nusxa oling: Sozlamalar → Zaxira nusxa → "Hozir nusxa olish".
+- `appsettings.Local.json` o'chirib qayta o'rnatishda (avval o'chirish, keyin o'rnatish) o'chadi: undagi CORS va Zaxira sozlamalarini oldin saqlab qo'ying. Oddiy yangilashda (ustidan o'rnatish) u saqlanadi.
 
 ## 9. Zaxira (backup)
 
-- Server har kuni bir marta o'zi nusxa oladi: `%ProgramData%\FuelControl\zaxira\fuelcontrol-YYYYMMDD-HHmmss.db` (oxirgi 30 kun saqlanadi). Qo'lda: Sozlamalar → Zaxira nusxa → "Hozir nusxa olish".
-- Zaxiralar **shu kompyuterning o'zida** — kompyuter buzilsa, ular ham yo'qoladi. `zaxira\` papkasini muntazam tashqi diskka yoki boshqa kompyuterga nusxalang.
+- **Qachon olinadi.** Har **smena yopilganda** (yopish javobidan keyin, fonda — yopishni sekinlashtirmaydi va xato bo'lsa ham buzmaydi) va qo'lda: Sozlamalar → Zaxira nusxa → "Hozir nusxa olish". Kunlik avtomatik nusxa yo'q. Fayl nomi: `fuelcontrol-YYYYMMDD-HHmmss-smena<N>.db` (qo'lda — `-qolda`; vaqt UTC). Eski versiyalardagi `fuelcontrol-YYYYMMDD-HHmmss.db` fayllar ham saqlanadi va ro'yxatda ko'rinadi.
+- **Qayerda.** Standart: `%ProgramData%\FuelControl\zaxira` (yashirin papka). Topish oson bo'lishi uchun `appsettings.Local.json` da `Zaxira:Papka` ni o'zgartiring, masalan `E:\\baza` (7-bo'lim), va xizmatni qayta ishga tushiring. Papka yo'q bo'lsa va disk ulangan bo'lsa yaratiladi. Yozib bo'lmasa (disk ulanmagan, papka yaratilmaydi va h.k.) nusxa **standart papkaga** tushadi: bu Sozlamalar → Zaxira nusxa'da ogohlantirish bilan ko'rinadi va logga yoziladi — zaxira to'xtamaydi. Disk qaytgach nusxalar yana sozlangan papkaga tushadi.
+- **Nechta saqlanadi.** Eng yangi 30 ta (`Zaxira:Saqlash`), eskilari o'chiriladi (ishlatilgan va standart papkada). Smena kuniga bir nechta yopilsa, 30 ta bir necha kunga yetadi — kerak bo'lsa sonni oshiring.
+- **Telegram'ga yuborish (ixtiyoriy).** Har yangi nusxa gzip qilinib botingiz orqali Telegram'ga yuboriladi (izohda shoxobcha, sana, sabab va hajm). Sozlash: (1) Telegram'da `@BotFather` → `/newbot` → bot tokenini oling; (2) botga `/start` yozing (guruhga yuborish uchun botni guruhga qo'shing) va `https://api.telegram.org/bot<TOKEN>/getUpdates` ni brauzerda oching — `chat` → `id` sizning chat ID'ingiz (guruhda manfiy son); (3) Sozlamalar → Zaxira nusxa: token va chat ID ni kiriting, "Yoqilgan" belgisini qo'ying, "Sinov yuborish" tugmasi bilan tekshiring. Bilish kerak: token serverda shifrlangan saqlanadi (shu kompyuterdan boshqasida ochilmaydi), ekranda faqat oxirgi 4 belgisi (`…ab12`) ko'rinadi, logga va auditga yozilmaydi; yuborilmasa (internet yo'q) xato Sozlamalarda ko'rinadi va keyingi nusxada (hamda har soatda) yuborilmagan oxirgi nusxa qayta yuboriladi; yoqilgan paytdan oldingi nusxalar yuborilmaydi; Telegram cheklovi 50 MB (gzip'dan keyin) — kattasi yuborilmaydi va holatda ko'rinadi.
+- Zaxiralar **shu kompyuterning o'zida** (yoki shu kompyuterga ulangan diskda) — kompyuter buzilsa, ular ham yo'qoladi. Telegram'ga yuborish yoki `zaxira\` papkasini muntazam tashqi diskka/boshqa kompyuterga nusxalash shundan himoya qiladi.
 - Tiklash (Administrator PowerShell):
 
 ```powershell
@@ -287,6 +308,8 @@ Sozlamalar → Ilovalar → **FuelControl** → O'chirish (yoki `unins000.exe`).
 - Windows xizmatini (`FuelControl`; o'rnatilgan bo'lsa `Cloudflared`) va xavfsizlik devori qoidasini olib tashlaydi;
 - dastur fayllarini va o'rnatuvchi yozgan sozlamalarni (`appsettings.*.json`, `sozlama.json`) o'chiradi;
 - **baza, zaxiralar va jurnallarga (`%ProgramData%\FuelControl\`) tegmaydi.** Ular kerak bo'lmasa, papkani qo'lda o'chiring.
+
+`appsettings.Local.json` ham o'chadi: undagi CORS va Zaxira sozlamalarini oldin saqlab qo'ying, qayta o'rnatgach tiklang.
 
 Qayta o'rnatganda eski baza topiladi va ishlatiladi (administrator paroli qayta so'ralmaydi).
 

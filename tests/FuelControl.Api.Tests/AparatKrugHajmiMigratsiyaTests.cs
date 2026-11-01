@@ -57,7 +57,7 @@ public sealed class AparatKrugHajmiMigratsiyaTests : IDisposable
         await using var db = await Otkaz();
 
         var qollangan = (await db.Database.GetAppliedMigrationsAsync()).ToList();
-        Assert.Equal("AparatKrugHajmi", qollangan[^1][15..]);                                                          // oxirgisi shu migratsiya (yangi migratsiya qo'shilsa, bu test yangilanadi)
+        Assert.Contains(qollangan, m => m.EndsWith("_AparatKrugHajmi", StringComparison.Ordinal));                     // shu migratsiya qo'llangan (keyingilari o'z testlarida)
         Assert.Equal("1", await Skalyar("SELECT COUNT(*) FROM pragma_table_info('Aparatlar') WHERE name = 'KrugHajmi' AND type = 'TEXT' AND \"notnull\" = 0 AND dflt_value IS NULL"));
         Assert.Equal("2", await Skalyar("SELECT COUNT(*) FROM \"Aparatlar\" WHERE \"KrugHajmi\" IS NULL"));          // hamma eski qator krug yo'q
         Assert.Equal("109797.58|5017.83|10560.52|8120.40", await Skalyar(

@@ -84,8 +84,14 @@ public sealed class DemoMalumotApiTests : ApiBaza
 
         // Operatorlar hisobi (Operatorlar.dc.html): Alisher 4 500 000 - 1 000 000 - 120 000; Dilshod 4 500 000 + 20 000.
         var operatorlar = (await admin.GetFromJsonAsync<FoydalanuvchiDto[]>("/operatorlar", Json))!.ToDictionary(f => f.Login);
-        Assert.Equal(3_380_000, (await Oqi<OperatorHisobDto>(await admin.GetAsync($"/operatorlar/{operatorlar["alisher"].Id}/hisob"))).Qoldiq);
-        Assert.Equal(4_520_000, (await Oqi<OperatorHisobDto>(await admin.GetAsync($"/operatorlar/{operatorlar["dilshod"].Id}/hisob"))).Qoldiq);
+        // Demo ma'lumot oktyabr uchun; API ishga tushganda MaoshYozuvchi joriy oy maoshini ham yozadi (noyabrdan boshlab) - u hisobga olinmaydi.
+        static async Task<long> OktyabrQoldigi(HttpClient admin, int id)
+        {
+            var h = await Oqi<OperatorHisobDto>(await admin.GetAsync($"/operatorlar/{id}/hisob"));
+            return h.Qoldiq - h.Harakatlar.Where(x => x.Turi == HarakatTuri.Maosh && x.Sana >= new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc)).Sum(x => x.Summa);
+        }
+        Assert.Equal(3_380_000, await OktyabrQoldigi(admin, operatorlar["alisher"].Id));
+        Assert.Equal(4_520_000, await OktyabrQoldigi(admin, operatorlar["dilshod"].Id));
     }
 
     [Fact]

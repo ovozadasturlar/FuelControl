@@ -78,6 +78,16 @@ public static class AuditMatnlari
         (eskiRaqam == yangiRaqam ? $"{yangiRaqam}-aparat · yoqilg'i {yoqilgiNomi}" : $"{eskiRaqam}-aparat raqami {yangiRaqam} ga o'zgardi · yoqilg'i {yoqilgiNomi}")
         + (krugOzgardi ? " · " + Krug(yangiKrug) : "");
 
+    /// <summary>Telegram sozlandi · token yangilandi · chat ID -1001234 · yoqilgan. Tokenning o'zi (va uning belgilari) hech qachon yozilmaydi.</summary>
+    public static string TelegramSozlandi(bool? tokenYangilandi, string? chatId, bool chatOzgardi, bool? yoqilgan)
+    {
+        var qismlar = new List<string>();
+        if (tokenYangilandi is { } t) qismlar.Add(t ? "token yangilandi" : "token o'chirildi");
+        if (chatOzgardi) qismlar.Add(string.IsNullOrEmpty(chatId) ? "chat ID o'chirildi" : $"chat ID {chatId}");
+        if (yoqilgan is { } y) qismlar.Add(y ? "yoqilgan" : "o'chirilgan");
+        return string.Join(" · ", qismlar);
+    }
+
     public static string BakTuzatildi(int aparatRaqami, decimal eski, decimal yangi, string sabab) =>
         $"{aparatRaqami}-aparat bak qoldig'i {Format.Litr(eski)} dan {Format.Litr(yangi)} ga · sabab: {sabab.Trim()}";
 

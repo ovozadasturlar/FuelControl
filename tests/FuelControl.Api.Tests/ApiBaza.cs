@@ -23,6 +23,10 @@ public abstract class ApiBaza : IAsyncLifetime
     protected static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
     private readonly string _papka = Path.Combine(Path.GetTempPath(), "fc-test-" + Guid.NewGuid().ToString("N"));
     protected WebApplicationFactory<Program> Ilova = null!;
+    /// <summary>Test papkasi (baza fc.db va zaxira shu yerda).</summary>
+    protected string Papka => _papka;
+    /// <summary>Qo'shimcha sozlamalar/servislar (soxta Telegram handler va h.k.): standart sozlamalardan keyin chaqiriladi.</summary>
+    protected virtual void Sozla(IWebHostBuilder b) { }
     /// <summary>ASP.NET Core muhiti: "Testing" (demo yozilmaydi), "Development" yoki "Web" (Seed:DemoMalumot=true bo'lsa demo yoziladi).</summary>
     protected virtual string Muhit => "Testing";
     protected virtual bool DemoSozlamasi => false;
@@ -38,6 +42,7 @@ public abstract class ApiBaza : IAsyncLifetime
             b.UseSetting("Seed:AdminParol", "admin1234");
             b.UseSetting("Seed:DemoMalumot", DemoSozlamasi ? "true" : "false");
             b.UseSetting("Zaxira:Papka", Path.Combine(_papka, "zaxira"));
+            Sozla(b);
         });
         return Task.CompletedTask;
     }

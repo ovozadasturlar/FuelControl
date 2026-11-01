@@ -574,6 +574,40 @@ namespace FuelControl.Api.Data.Migrations
                     b.ToTable("Yoqilgilar");
                 });
 
+            modelBuilder.Entity("FuelControl.Core.Modellar.ZaxiraSozlamasi", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OxirgiYuborilganFayl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TelegramChatId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TelegramTokenShifr")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TelegramYoqilgan")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool?>("YuborishMuvaffaqiyat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("YuborishTuri")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("YuborishVaqti")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("YuborishXabari")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ZaxiraSozlamalari");
+                });
+
             modelBuilder.Entity("FuelControl.Core.Modellar.Aparat", b =>
                 {
                     b.HasOne("FuelControl.Core.Modellar.YoqilgiTuri", null)

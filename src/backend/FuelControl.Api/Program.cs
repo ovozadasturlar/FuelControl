@@ -64,7 +64,15 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<FoydalanuvchiKeshi>();
 builder.Services.AddSingleton<UlanishlarXaritasi>();
 builder.Services.AddSingleton<ZaxiraXizmati>();
+builder.Services.AddSingleton<ISirShifrlovchi, SirShifrlovchi>();
+builder.Services.AddSingleton<TelegramYuboruvchi>();
+builder.Services.AddSingleton<ZaxiraTelegram>();
+builder.Services.AddSingleton<ZaxiraNavbati>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ZaxiraNavbati>());
 builder.Services.AddHostedService<KunlikIshlarFonXizmati>();
+// Bot tokeni so'rov manzilida: shu mijozning standart HTTP logi (manzilni yozadi) o'chiriladi.
+builder.Services.AddHttpClient(TelegramYuboruvchi.MijozNomi, c => { c.BaseAddress = new Uri("https://api.telegram.org/"); c.Timeout = TimeSpan.FromMinutes(6); })
+    .RemoveAllLoggers();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
@@ -142,7 +150,7 @@ app.SmenaUlash();
 app.NasiyaUlash();
 app.XarajatUlash();
 app.HisobotUlash();
-app.Services.GetRequiredService<ZaxiraXizmati>().Ulash(app);
+app.ZaxiraUlash();
 app.MapHub<SotuvHub>("/hub").RequireAuthorization();
 
 try

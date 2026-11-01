@@ -24,17 +24,16 @@
 .PARAMETER SkipTunnel
     O'rnatuvchi cloudflared'siz yig'ilgan bo'lsa (build.ps1 -SkipCloudflared), tunnel sinovini o'tkazib yuboradi.
 .PARAMETER OldSetup
-    Avvalgi versiya o'rnatuvchisi (joriy API shaklidagi reliz, >= 0.1.3; masalan, Output\FuelControl-Setup-0.1.3.exe). Berilsa, mijoz
+    Avvalgi versiya o'rnatuvchisi (joriy API shaklidagi reliz, >= 0.1.4; masalan, Output\FuelControl-Setup-0.1.4.exe). Berilsa, mijoz
     qurilmasidagi (jonli bazali) reja sinaladi: eski versiya o'rnatiladi va unda mijozdagidek ma'lumot yaratiladi (3 foydalanuvchi, 2 yoqilg'i
-    va aparat - 4-aparat DIZEL ECO, 5-aparat pulti 10 000 da 0 ga qaytadi; bak tuzatish va kirimi; operator yopgan smena: nasiya, xarajat,
-    kamomat; avans; yana bitta OCHIQ smena: unda nasiya, qarz qaytishi va NOTO'G'RI ko'rsatkichli narx o'zgarishi segmenti) -> o'chiriladi
-    (ma'lumot papkasi SAQLANADI; hamma jadvalning barmoq izi olinadi) -> yangisi /ADMINPAROL'siz o'rnatiladi (eski parol, foydalanuvchilar va
-    yaratilgan ma'lumot joyida, desktop sozlama.json va yorliqlar to'g'ri; o'rnatish va API'ning birinchi ishga tushishi eski ustunlarning
-    hech birini o'zgartirmaydi, faqat Aparatlar.KrugHajmi ustuni qo'shiladi; qator soni va har bir qiymat, aparatlarning total va bak
-    qoldig'i santimigacha API va bazaning o'zidan tekshiriladi) -> ochiq smenada narx o'zgarishi ko'rsatkichi PUT /smenalar/{id}/narx-korsatkichi
-    bilan tuzatiladi (rad etiladigan so'rovlar; qisqartirish; segment boshiga tenglashtirib o'chirish; audit), 5-aparatga krug hajmi 10 000
-    yoqiladi va smena shu aparat krugdan o'tgan holda yopiladi (farq 0, bak va pult to'g'ri; faqat kutilgan jadvallar o'zgargan) ->
-    /ADMINPAROL berilsa ham e'tiborga olinmaydi -> ma'lumot papkasi o'chirilib toza o'rnatiladi.
+    va aparat - 5-aparatda krug 10 000; bak tuzatish va kirimi; operator yopgan smena: nasiya, xarajat, kamomat; avans; qo'lda zaxira nusxa; yana
+    bitta OCHIQ smena: unda nasiya, qarz qaytishi va narx o'zgarishi segmenti) -> o'chiriladi (ma'lumot papkasi SAQLANADI; hamma jadvalning
+    barmoq izi va zaxira fayllarining xeshi olinadi) -> yangisi /ADMINPAROL'siz o'rnatiladi (eski parol, foydalanuvchilar va yaratilgan ma'lumot
+    joyida; o'rnatish va API'ning birinchi ishga tushishi eski jadvallarning hech birini o'zgartirmaydi, faqat bo'sh ZaxiraSozlamalari jadvali
+    qo'shiladi, eski zaxira nusxalari bayt-bayt joyida, kunlik avtomatik nusxa olinmaydi) -> Telegram sozlanadi (token maskalanadi, sinov xabari -
+    tashqi xato 200 bilan), smena yopiladi va fonda zaxira nusxa olinadi, appsettings.Local.json orqali papka (E:\baza kabi) va yozib bo'lmaydigan
+    papkada standart papkaga o'tish, yangilashda Local.json va token saqlanadi -> /ADMINPAROL berilsa ham e'tiborga olinmaydi, o'chirib qayta
+    o'rnatganda (JWT kaliti yangilanadi) token baribir saqlanadi -> ma'lumot papkasi o'chirilib toza o'rnatiladi.
 .PARAMETER KeepFiles
     Muvaffaqiyatli tugaganda ham ish papkasini o'chirmaydi.
 
@@ -225,6 +224,16 @@ function Iz-Farqi($a, $b, [string[]] $istisno = @()) {
 function Login([int] $port, [string] $pwd, [string] $login = 'admin') {
     $body = @{ login = $login; parolYokiPin = $pwd } | ConvertTo-Json
     try { Invoke-RestMethod "http://127.0.0.1:$port/auth/login" -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) } catch { $null }
+}
+
+# API jurnal fayllari (Serilog shared): API ishlab turganda ham o'qiladi.
+function Log-Matni([string] $papka) {
+    $m = ''
+    foreach ($f in Get-ChildItem -LiteralPath $papka -Filter 'fuelcontrol-*.log' -ErrorAction SilentlyContinue) {
+        $fs = [IO.File]::Open($f.FullName, 'Open', 'Read', 'ReadWrite')
+        try { $m += (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() }
+    }
+    $m
 }
 
 function Uninstall-One([string] $dir) {
@@ -428,9 +437,9 @@ try {
             $r = Login $p4 $eskiParol
             $opT = Login $p4 $opParol $opLogin
             Check (($null -ne $r) -and ($null -ne $opT)) "eski versiya: admin va operator ($opLogin) kirdi"
-            $apr2 = Put-Json $p4 $r.token "/aparatlar/$($apr2.id)" @{ raqam = 5; yoqilgiTuriId = $yoq2.id; bakQoldiq = [decimal]8200; sabab = 'sinov: qoldiq sanab tuzatildi' }
+            $apr2 = Put-Json $p4 $r.token "/aparatlar/$($apr2.id)" @{ raqam = 5; yoqilgiTuriId = $yoq2.id; bakQoldiq = [decimal]8200; sabab = 'sinov: qoldiq sanab tuzatildi'; krugHajmi = [decimal]10000 }
             $apr2 = Post-Json $p4 $r.token "/aparatlar/$($apr2.id)/kirim" @{ litr = [decimal]2000; vaqt = $null; hujjat = 'YX-1176' }
-            Check (($apr2.bakQoldiq -eq 10200) -and ([decimal]$apr2.totalLitr -eq [decimal]19880.52)) "eski versiyada bak: 5-aparat qoldig'i tuzatildi (8 200), kirim +2 000 L (10 200)"
+            Check (($apr2.bakQoldiq -eq 10200) -and ([decimal]$apr2.totalLitr -eq [decimal]19880.52) -and ([decimal]$apr2.krugHajmi -eq 10000)) "eski versiyada: 5-aparatga krug 10 000, bak qoldig'i tuzatildi (8 200), kirim +2 000 L (10 200)"
             # Birinchi smenani operatorning o'zi ochadi va yopadi: kamomat shu operator hisobiga tushadi.
             $ot = $opT.token
             $sm = Post-Json $p4 $ot '/smenalar/och' @{ qaytim = 100000; terminal = 50000; depozit = 200000 }
@@ -448,9 +457,11 @@ try {
             $qay = Post-Json $p4 $r.token "/nasiyalar/$($ns1.id)/qaytish" @{ summa = 30000; usul = 'Naqd'; smenaHisobiga = $true; izoh = $null }
             Check (($ns2.summa -eq 40000) -and ($qay.qoldiq -eq 170000)) "eski versiyada ochiq smenada nasiya (40 000) va qarz qaytishi (30 000) yozildi"
             # Narx 15 500 -> 16 000. 4-aparat ko'rsatkichi narx o'zgarguncha savdo bo'lmagani uchun 109 797.58 bo'lishi kerak edi, 1 099 797.58 yozildi (990 000 L).
-            $narx = Put-Json $p4 $r.token "/yoqilgilar/$($yoq.id)" @{ nomi = 'Sinov Dizel ECO'; narx = 16000; rang = '#2563EB'; korsatkichlar = @(@{ aparatId = $apr.id; qiymat = [decimal]1099797.58 }) }
+            $narx = Put-Json $p4 $r.token "/yoqilgilar/$($yoq.id)" @{ nomi = 'Sinov Dizel ECO'; narx = 16000; rang = '#2563EB'; korsatkichlar = @(@{ aparatId = $apr.id; qiymat = [decimal]109847.58 }) }
             $sg = @((Get-Json $p4 $r.token '/smenalar/joriy').korsatkichlar)
-            Check (($narx.narx -eq 16000) -and ($sg.Count -eq 1) -and ($sg[0].aparatRaqam -eq 4) -and ([decimal]$sg[0].boshi -eq [decimal]109797.58) -and ([decimal]$sg[0].oxiri -eq [decimal]1099797.58) -and ($sg[0].narx -eq 15500) -and ([decimal]$sg[0].litr -eq [decimal]990000) -and ($sg[0].summa -eq 15345000000) -and ($sg[0].narxOzgarishida -eq $true)) "eski versiyada ochiq smenada narx o'zgarishi segmenti noto'g'ri ko'rsatkich bilan yozildi: 109 797.58 -> 1 099 797.58 (990 000 L x 15 500)"
+            Check (($narx.narx -eq 16000) -and ($sg.Count -eq 1) -and ($sg[0].aparatRaqam -eq 4) -and ([decimal]$sg[0].boshi -eq [decimal]109797.58) -and ([decimal]$sg[0].oxiri -eq [decimal]109847.58) -and ($sg[0].narx -eq 15500) -and ([decimal]$sg[0].litr -eq [decimal]50) -and ($sg[0].summa -eq 775000) -and ($sg[0].narxOzgarishida -eq $true)) "eski versiyada ochiq smenada narx o'zgarishi segmenti yozildi: 109 797.58 -> 109 847.58 (50 L x 15 500)"
+            $zaxOld = Post-Json $p4 $r.token '/zaxira' @{}
+            Check (($zaxOld.hajmBayt -gt 0) -and (Test-Path -LiteralPath (Join-Path "$data6\zaxira" $zaxOld.faylNomi))) "eski versiyada qo'lda zaxira nusxa olindi: $($zaxOld.faylNomi)"
         }
         Stop-Api
         Uninstall-One $app6
@@ -463,10 +474,14 @@ try {
             ForEach-Object { [regex]::Match($_.Name, '^(\d{14}_\w+)\.cs$') } | Where-Object { $_.Success } | ForEach-Object { $_.Groups[1].Value })
         $eskiMig = Sql-Qatorlar $dbFayl 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
         $yangiMigId = @($repoMig | Where-Object { $eskiMig -notcontains $_ })
-        Check (($eskiMig.Count -eq $repoMig.Count - 1) -and (@($eskiMig | Where-Object { $repoMig -notcontains $_ }).Count -eq 0) -and ($yangiMigId.Count -eq 1) -and ($yangiMigId[0] -match '_AparatKrugHajmi$')) "eski baza: $($eskiMig.Count) ta migratsiya (oxirgisi $($eskiMig[-1])); bu reliz bitta yangi migratsiya qo'shadi: $($yangiMigId -join ', ')"
+        Check (($eskiMig.Count -eq $repoMig.Count - 1) -and (@($eskiMig | Where-Object { $repoMig -notcontains $_ }).Count -eq 0) -and ($yangiMigId.Count -eq 1) -and ($yangiMigId[0] -match '_ZaxiraSozlamalari$')) "eski baza: $($eskiMig.Count) ta migratsiya (oxirgisi $($eskiMig[-1])); bu reliz bitta yangi migratsiya qo'shadi: $($yangiMigId -join ', ')"
         $ustunEski = Baza-Ustunlari $dbFayl
         $izEski = Baza-Izi $dbFayl
-        Check (@($ustunEski['Aparatlar'].Split(',') | Where-Object { $_.Trim() -eq '"KrugHajmi"' }).Count -eq 0) "eski baza: Aparatlar jadvalida KrugHajmi ustuni yo'q (eski sxema)"
+        Check (-not $ustunEski.ContainsKey('ZaxiraSozlamalari')) "eski baza: ZaxiraSozlamalari jadvali yo'q (eski sxema)"
+        $krugEski = Sql-Qatorlar $dbFayl 'SELECT Raqam, KrugHajmi FROM Aparatlar ORDER BY Raqam'
+        Check (($krugEski[0] -eq '4|') -and ($krugEski[1] -match '^5\|10000')) "eski baza: 5-aparatda krug 10 000, 4-aparatda yo'q ($($krugEski -join '; '))"
+        $zaxEski = @{}; foreach ($zf in Get-ChildItem "$data6\zaxira" -Filter 'fuelcontrol-*.db') { $zaxEski[$zf.Name] = (Get-FileHash $zf.FullName -Algorithm SHA256).Hash }
+        Check (($zaxEski.Count -ge 2) -and (@($zaxEski.Keys | Where-Object { $_ -notmatch '^fuelcontrol-\d{8}-\d{6}\.db$' }).Count -eq 0)) "eski versiya zaxira nusxalari: $($zaxEski.Count) ta (kunlik va qo'lda), hammasi eski nomda (sababsiz)"
         $kutilgan = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 3; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3 }
         $tavsif = ($kutilgan.Keys | ForEach-Object { '{0} {1}' -f $_, $kutilgan[$_] }) -join ', '
         $nomos = @($kutilgan.Keys | Where-Object { (Iz-Soni $izEski $_) -ne $kutilgan[$_] })
@@ -503,17 +518,19 @@ try {
         Check $up "yangi API eski bazada ishga tushdi (migratsiya qo'llandi)"
         Stop-Api
         $izYangi1 = Baza-Izi $dbFayl $ustunEski
-        $farq1 = Iz-Farqi $izEski $izYangi1 @('__EFMigrationsHistory')
+        $farq1 = Iz-Farqi $izEski $izYangi1 @('__EFMigrationsHistory', 'ZaxiraSozlamalari')
         Check ($farq1.Count -eq 0) "yangi API birinchi marta ishga tushgach hech bir jadvalning eski ustunlari o'zgarmadi (foydalanuvchilar, aparatlar, bak, segmentlar, nasiya, harakat, audit)$(if ($farq1.Count) { ' - farq: ' + ($farq1 -join ', ') })"
         $nomos = @($kutilgan.Keys | Where-Object { (Iz-Soni $izYangi1 $_) -ne $kutilgan[$_] })
         Check (($nomos.Count -eq 0) -and ((Iz-Soni $izYangi1 'Audit') -eq $auditEski)) "yangilashdan keyin qatorlar soni joyida: $tavsif, audit $auditEski"
         $mig1 = Sql-Qatorlar $dbFayl 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
         Check (($mig1.Count -eq $eskiMig.Count + 1) -and ((@($mig1 | Select-Object -First $eskiMig.Count) -join ';') -eq ($eskiMig -join ';')) -and ($mig1[-1] -eq $yangiMigId[0])) "migratsiyalar tarixi: eski $($eskiMig.Count) ta yozuv joyida, bittasi qo'shildi - $($mig1[-1])"
-        $ust1 = Sql-Qatorlar $dbFayl 'PRAGMA table_info(Aparatlar)'
-        $krugUstun = @($ust1 | Where-Object { $_.Split('|')[1] -eq 'KrugHajmi' })
-        Check (($krugUstun.Count -eq 1) -and ($krugUstun[0] -match '^\d+\|KrugHajmi\|TEXT\|0\|\|0$')) "Aparatlar.KrugHajmi ustuni qo'shildi: TEXT, NULL ruxsat, standart qiymatsiz"
-        $nullSoni = Sql-Qatorlar $dbFayl 'SELECT COUNT(*) FROM Aparatlar WHERE KrugHajmi IS NULL'
-        Check ($nullSoni[0] -eq '2') "mavjud aparatlarning hammasida KrugHajmi null (krug yo'q)"
+        $zUst = Sql-Qatorlar $dbFayl 'PRAGMA table_info(ZaxiraSozlamalari)'
+        Check ((($zUst | ForEach-Object { $_.Split('|')[1] }) -join ',') -eq 'Id,TelegramTokenShifr,TelegramChatId,TelegramYoqilgan,YuborishVaqti,YuborishMuvaffaqiyat,YuborishXabari,YuborishTuri,OxirgiYuborilganFayl') "yangi ZaxiraSozlamalari jadvali yaratildi (token shifri, chat ID, yuborish holati)"
+        Check ((Sql-Qatorlar $dbFayl 'SELECT COUNT(*) FROM ZaxiraSozlamalari')[0] -eq '0') "ZaxiraSozlamalari jadvali bo'sh (token va sozlama hali kiritilmagan)"
+        $krugYangi = Sql-Qatorlar $dbFayl 'SELECT Raqam, KrugHajmi FROM Aparatlar ORDER BY Raqam'
+        Check (($krugYangi[0] -eq '4|') -and ($krugYangi[1] -match '^5\|10000')) "aparatlar krug hajmi o'zgarmadi: 4-aparatda yo'q, 5-aparatda 10 000"
+        $zaxYangi = @{}; foreach ($zf in Get-ChildItem "$data6\zaxira" -Filter 'fuelcontrol-*.db') { $zaxYangi[$zf.Name] = (Get-FileHash $zf.FullName -Algorithm SHA256).Hash }
+        Check (((($zaxYangi.Keys | Sort-Object) -join ';') -eq (($zaxEski.Keys | Sort-Object) -join ';')) -and (@($zaxEski.Keys | Where-Object { $zaxYangi[$_] -ne $zaxEski[$_] }).Count -eq 0)) "eski zaxira nusxalari ($($zaxEski.Count) ta) bayt-bayt joyida; yangi API ishga tushganda kunlik nusxa olinmadi"
         $aprYangi = Sql-Qatorlar $dbFayl 'SELECT Raqam, TotalLitr, BakQoldiq FROM Aparatlar ORDER BY Raqam'
         Check (($aprYangi -join ';') -eq ($aprEski -join ';')) "aparatlarning total va bak qoldig'i santimigacha o'zgarmadi ($($aprYangi -join '; '))"
         $sm2Yangi = Sql-Qatorlar $dbFayl "SELECT * FROM Smenalar WHERE Id = $($sm2.id)"
@@ -535,7 +552,7 @@ try {
                 $y1 = @($y | Where-Object { $_.nomi -eq 'Sinov Dizel ECO' }); $y2 = @($y | Where-Object { $_.nomi -eq 'Sinov AI-95' })
                 Check (($y.Count -eq 2) -and ($y1.Count -eq 1) -and ($y1[0].narx -eq 16000) -and ($y2.Count -eq 1) -and ($y2[0].narx -eq 14200)) "yoqilg'ilar joyida: Sinov Dizel ECO (16 000 - ochiq smenada o'zgargan narx), Sinov AI-95 14 200"
                 $a = @(Get-Json $p4 $tk '/aparatlar')
-                Check (($a.Count -eq 2) -and ($a[0].raqam -eq 4) -and ([decimal]$a[0].totalLitr -eq [decimal]109797.58) -and ([decimal]$a[0].bakQoldiq -eq [decimal]5017.83) -and ($a[1].raqam -eq 5) -and ([decimal]$a[1].totalLitr -eq [decimal]19930.52) -and ([decimal]$a[1].bakQoldiq -eq [decimal]10150) -and ($null -eq $a[0].krugHajmi) -and ($null -eq $a[1].krugHajmi)) "aparatlar joyida (santimigacha): 4-aparat total 109797.58 / bak 5017.83, 5-aparat total 19930.52 / bak 10150.00; krug yo'q (null)"
+                Check (($a.Count -eq 2) -and ($a[0].raqam -eq 4) -and ([decimal]$a[0].totalLitr -eq [decimal]109797.58) -and ([decimal]$a[0].bakQoldiq -eq [decimal]5017.83) -and ($a[1].raqam -eq 5) -and ([decimal]$a[1].totalLitr -eq [decimal]19930.52) -and ([decimal]$a[1].bakQoldiq -eq [decimal]10150) -and ($null -eq $a[0].krugHajmi) -and ([decimal]$a[1].krugHajmi -eq 10000)) "aparatlar joyida (santimigacha): 4-aparat total 109797.58 / bak 5017.83, 5-aparat total 19930.52 / bak 10150.00; krug: 4-aparatda yo'q, 5-aparatda 10 000"
                 $bk = @(Get-Json $p4 $tk '/bak-kirimlar')
                 Check (($bk.Count -eq 1) -and ($bk[0].aparatRaqam -eq 5) -and ([decimal]$bk[0].litr -eq [decimal]2000) -and ([decimal]$bk[0].qoldiqOldin -eq [decimal]8200) -and ([decimal]$bk[0].qoldiqKeyin -eq [decimal]10200) -and ($bk[0].hujjat -eq 'YX-1176')) "bak kirimi joyida: 5-aparat +2 000 L (8 200 -> 10 200), yuk xati YX-1176"
                 $s = @(Get-Json $p4 $tk '/smenalar')
@@ -556,87 +573,101 @@ try {
                 Check (($j.smena.id -eq $sm2.id) -and ($null -eq $j.smena.tugadi) -and ($j.smena.ochishQaytim -eq 80000) -and ($j.smena.ochishTerminal -eq 70000) -and ($j.smena.ochishDepozit -eq 300000)) "ochiq smena joyida (eski versiyada ochilgan, id $($sm2.id)): ochilish qoldiqlari 80 000 / 70 000 / 300 000"
                 Check (($j.smena.nasiyaJami -eq 40000) -and ($j.smena.qaytganNasiya -eq 30000) -and (@($j.nasiyalar).Count -eq 1) -and (@($j.qaytishlar).Count -eq 1)) "ochiq smena yig'indisi joyida: nasiya 40 000, qaytgan 30 000"
                 $sg = @($j.korsatkichlar)
-                Check (($sg.Count -eq 1) -and ($sg[0].aparatRaqam -eq 4) -and ([decimal]$sg[0].boshi -eq [decimal]109797.58) -and ([decimal]$sg[0].oxiri -eq [decimal]1099797.58) -and ($sg[0].narx -eq 15500) -and ($sg[0].summa -eq 15345000000) -and ($sg[0].narxOzgarishida -eq $true)) "ochiq smenaning narx o'zgarishi segmenti joyida: 4-aparat 109 797.58 -> 1 099 797.58, eski narx 15 500 (hali tuzatilmagan)"
+                Check (($sg.Count -eq 1) -and ($sg[0].aparatRaqam -eq 4) -and ([decimal]$sg[0].boshi -eq [decimal]109797.58) -and ([decimal]$sg[0].oxiri -eq [decimal]109847.58) -and ($sg[0].narx -eq 15500) -and ($sg[0].summa -eq 775000) -and ($sg[0].narxOzgarishida -eq $true)) "ochiq smenaning narx o'zgarishi segmenti joyida: 4-aparat 109 797.58 -> 109 847.58, narx 15 500"
                 foreach ($yol in '/boshqaruv', '/hisobot', '/xarajatlar') {
                     $kod = try { (Invoke-WebRequest "$api6$yol" -Headers @{ Authorization = "Bearer $tk" } -UseBasicParsing).StatusCode } catch { 0 }
                     Check ($kod -eq 200) "GET $yol -> $kod"
                 }
 
-                # --- Spec 8.14: ochiq smenada narx o'zgarishi ko'rsatkichini tuzatish (mijozdagi 2026-10-17 holati) ---
-                $bt = $bosh.token
-                $url = "/smenalar/$($sm2.id)/narx-korsatkichi"
-                $nuqta = [char] 0x00B7
-                # Tuzatishsiz smenani yopib bo'lmaydi: yopish ko'rsatkichi 1 099 797.58 dan kichik bo'lolmaydi.
-                $kors3 = @($a | ForEach-Object { @{ aparatId = $_.id; qiymat = [decimal]$_.totalLitr + [decimal]100 } })
-                $xy = Post-Xato $p4 $tk "/smenalar/$($sm2.id)/yop" @{ korsatkichlar = $kors3; terminal = 125000; depozit = 320000; sanalganNaqd = 3015000; izoh = $null; plastikSummalari = @(60000, 65000) }
-                Check (($xy.Kod -eq 400) -and ($xy.Matn -match 'kichik') -and ((Get-Json $p4 $tk '/smenalar/joriy').smena.id -eq $sm2.id)) "tuzatishsiz smenani yopib bo'lmaydi (kod $($xy.Kod)): yopish ko'rsatkichi 1 099 797.58 dan kichik bo'lolmaydi, smena ochiq qoldi"
-                # Rad etiladigan so'rovlar (segmentga tegmaydi).
-                $tana = @{ aparatId = $a[0].id; qiymat = [decimal]109847.58; sabab = 'Pult noto''g''ri yozilgan' }
-                $x403 = Put-Xato $p4 $op.token $url $tana
-                $x400a = Put-Xato $p4 $bt $url @{ aparatId = $a[0].id; qiymat = [decimal]109847.58; sabab = '  ' }
-                $x400b = Put-Xato $p4 $bt $url @{ aparatId = $a[0].id; qiymat = [decimal]109797.57; sabab = 'tekshiruv' }
-                $x400c = Put-Xato $p4 $bt $url @{ aparatId = $a[0].id; qiymat = [decimal]1099797.58; sabab = 'tekshiruv' }
-                $x409a = Put-Xato $p4 $bt $url @{ aparatId = $a[1].id; qiymat = [decimal]19980; sabab = 'tekshiruv' }
-                $x404a = Put-Xato $p4 $bt $url @{ aparatId = 99999; qiymat = [decimal]1; sabab = 'tekshiruv' }
-                $x409b = Put-Xato $p4 $bt "/smenalar/$($sm.id)/narx-korsatkichi" $tana
-                $x404b = Put-Xato $p4 $bt '/smenalar/99999/narx-korsatkichi' $tana
-                Check ($x403.Kod -eq 403) "operator (KorsatkichTuzatish ruxsatisiz) tuzata olmaydi: 403 (kod $($x403.Kod))"
-                Check (($x400a.Kod -eq 400) -and ($x400a.Matn -match 'sababi majburiy')) "sabab bo'sh -> 400 (kod $($x400a.Kod))"
-                Check (($x400b.Kod -eq 400) -and ($x400b.Matn -match 'kichik')) "qiymat narx o'zgarishi boshlanishidan kichik (109 797.57) -> 400 (kod $($x400b.Kod))"
-                Check (($x400c.Kod -eq 400) -and ($x400c.Matn -match 'farq qilishi kerak')) "qiymat joriy ko'rsatkichga teng -> 400 (kod $($x400c.Kod))"
-                Check (($x409a.Kod -eq 409) -and ($x409a.Matn -match 'ochiq smenada narx')) "5-aparatda narx o'zgarishi segmenti yo'q -> 409 (kod $($x409a.Kod))"
-                Check (($x404a.Kod -eq 404) -and ($x409b.Kod -eq 409) -and ($x404b.Kod -eq 404)) "aparat yo'q -> 404 (kod $($x404a.Kod)); yopilgan smena -> 409 (kod $($x409b.Kod)); smena yo'q -> 404 (kod $($x404b.Kod))"
-                $sg1 = @((Get-Json $p4 $tk '/smenalar/joriy').korsatkichlar)
-                Check (($sg1.Count -eq 1) -and ([decimal]$sg1[0].oxiri -eq [decimal]1099797.58)) "rad etilgan so'rovlar segmentga tegmadi (1 099 797.58 joyida)"
-                # 1) 4-aparat: narx o'zgarguncha aslida 50 L sotilgan edi (109 847.58): qator qisqaradi, narx eskicha.
-                $t1 = Put-Json $p4 $bt $url $tana
-                $k1 = @($t1.korsatkichlar)
-                Check (($t1.smena.id -eq $sm2.id) -and ($null -eq $t1.smena.tugadi) -and ($k1.Count -eq 1) -and ([decimal]$k1[0].boshi -eq [decimal]109797.58) -and ([decimal]$k1[0].oxiri -eq [decimal]109847.58) -and ($k1[0].narx -eq 15500) -and ([decimal]$k1[0].litr -eq [decimal]50) -and ($k1[0].summa -eq 775000) -and ($k1[0].narxOzgarishida -eq $true)) "PUT narx-korsatkichi (boshliq): 1 099 797.58 -> 109 847.58; segment 50 L x 15 500 = 775 000, narx eskicha, smena ochiq"
+                # --- Spec 8.17: zaxira nusxa (smena yopilganda, soni bo'yicha saqlash, E:\baza kabi papka va zaxira papka, Telegram) ---
+                $zaxPapka = "$data6\zaxira"
+                $uch = [string][char] 0x2026
+                $tgToken = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'; $tgChat = '-1001234567890'
+                $hz = Get-Json $p4 $tk '/zaxira/holat'
+                Check (($hz.papka -eq $zaxPapka) -and ($hz.sozlanganPapka -eq $zaxPapka) -and ($hz.standartPapkaga -eq $false) -and ($null -eq $hz.standartPapkaSababi) -and ($hz.saqlash -eq 30)) "zaxira holati: papka $zaxPapka (standart), ogohlantirish yo'q, 30 ta saqlanadi"
+                $royxat0 = (@($hz.nusxalar | ForEach-Object { $_.nomi }) | Sort-Object) -join ';'
+                Check (($royxat0 -eq (($zaxEski.Keys | Sort-Object) -join ';')) -and (@($hz.nusxalar | Where-Object { $_.sabab -ne '' -or $null -ne $_.smenaId }).Count -eq 0)) "eski versiya nusxalari ($($zaxEski.Count) ta, sababsiz nomli) ro'yxatda ko'rinadi"
+                Check (($hz.telegram.yoqilgan -eq $true) -and ($hz.telegram.faol -eq $false) -and ($null -eq $hz.telegram.tokenMaska)) "Telegram sozlanmagan: faol emas, token yo'q"
+                $xt = Put-Xato $p4 $tk '/zaxira/telegram' @{ token = 'yomon-token-qiymati-123' }
+                Check (($xt.Kod -eq 400) -and ($xt.Matn -notmatch 'yomon-token')) "noto'g'ri token formati -> 400 (kod $($xt.Kod)), xato matnida kiritilgan qiymat yo'q"
+                $put = Put-Json $p4 $tk '/zaxira/telegram' @{ token = $tgToken; chatId = $tgChat }
+                Check (($put.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($put.telegram.chatId -eq $tgChat) -and ($put.telegram.faol -eq $true) -and ($put.telegram.yoqilgan -eq $true)) "Telegram sozlandi: token faqat maska (...Dsaw), chat ID, faol"
+                $xom = (Invoke-WebRequest "$api6/zaxira/holat" -Headers @{ Authorization = "Bearer $tk" } -UseBasicParsing).Content
+                Check (($xom -notmatch 'AAHdq') -and ($xom -notmatch '123456789:')) "GET /zaxira/holat javobida token yo'q (faqat maska)"
+                $sn = Post-Json $p4 $tk '/zaxira/telegram/sinov' @{}
+                Check (($sn.telegram.oxirgiTuri -eq 'sinov') -and ($sn.telegram.oxirgiMuvaffaqiyat -eq $false) -and ($sn.telegram.oxirgiXabar -notmatch 'AAHdq')) "Sinov yuborish: haqiqiy tarmoq, soxta token -> 200 va holatda xato (tashqi xato 4xx/5xx emas): [$($sn.telegram.oxirgiXabar)]"
+
+                # Smena yopiladi: yopish javobidan keyin fonda nusxa olinadi va (Telegram yoqilgani uchun) yuborishga urinadi.
+                $fayllar0 = @(Get-ChildItem $zaxPapka -Filter 'fuelcontrol-*.db').Count
                 $a1 = @(Get-Json $p4 $tk '/aparatlar')
-                Check (([decimal]$a1[0].totalLitr -eq [decimal]109797.58) -and ([decimal]$a1[0].bakQoldiq -eq [decimal]5017.83) -and ([decimal]$a1[1].totalLitr -eq [decimal]19930.52) -and ([decimal]$a1[1].bakQoldiq -eq [decimal]10150)) "tuzatishdan pult va bak qoldig'i o'zgarmadi (4: 109797.58 / 5017.83, 5: 19930.52 / 10150.00)"
-                # 2) Narx o'zgarguncha umuman savdo bo'lmagan (109 797.58): qator o'chadi.
-                $t2 = Put-Json $p4 $bt $url @{ aparatId = $a[0].id; qiymat = [decimal]109797.58; sabab = 'Narx o''zgarguncha savdo bo''lmagan' }
-                Check (($t2.smena.id -eq $sm2.id) -and ($null -eq $t2.smena.tugadi) -and (@($t2.korsatkichlar).Count -eq 0) -and (@((Get-Json $p4 $tk '/smenalar/joriy').korsatkichlar).Count -eq 0)) "PUT narx-korsatkichi: 109 797.58 (segment boshiga teng) -> qator o'chdi, ochiq smenada segment yo'q"
-                $au = @(Get-Json $p4 $tk '/audit?tur=tuzatish')
-                $m1 = "Smena #$($sm2.id) $nuqta 4-aparat narx o'zgarishidagi ko'rsatkich 1 099 797.58 dan 109 847.58 ga $nuqta sabab: Pult noto'g'ri yozilgan"
-                $m2 = "Smena #$($sm2.id) $nuqta 4-aparat narx o'zgarishidagi ko'rsatkich 109 847.58 dan 109 797.58 ga $nuqta sabab: Narx o'zgarguncha savdo bo'lmagan"
-                Check (($au.Count -eq 2) -and (@($au | Where-Object { $_.tafsilot -eq $m1 -and $_.kim -eq 'Sinov Boshliq' -and $_.amal -eq "Ko'rsatkich tuzatildi" }).Count -eq 1) -and (@($au | Where-Object { $_.tafsilot -eq $m2 }).Count -eq 1)) "audit: ikki 'Ko'rsatkich tuzatildi' yozuvi (tur tuzatish, kim Sinov Boshliq), matn spec bo'yicha"
-                Check ((Count-Json $p4 $tk '/audit') -eq ($auditEski + 2)) "audit yozuvlari soni $auditEski -> $($auditEski + 2) (rad etilgan so'rovlar audit yozmadi)"
-                $hs2 = Get-Json $p4 $tk "/operatorlar/$($opU.id)/hisob"
-                Check (@($hs2.harakatlar).Count -eq 3) "tuzatish kamomat/ortiqcha harakatini yozmadi (operator harakatlari 3 ta)"
+                $kors2 = @(@{ aparatId = $a1[0].id; qiymat = [decimal]109897.58 }, @{ aparatId = $a1[1].id; qiymat = [decimal]20030.52 })
+                $yop2 = Post-Json $p4 $tk "/smenalar/$($sm2.id)/yop" @{ korsatkichlar = $kors2; terminal = 125000; depozit = 320000; sanalganNaqd = 2990000; izoh = $null; plastikSummalari = @(60000, 65000) }
+                Check (($yop2.savdo -eq 2995000) -and ($yop2.kutilgan -eq 2990000) -and ($yop2.farq -eq 0) -and ($null -ne $yop2.tugadi)) "smena yopildi: 50 L x 15 500 + 50 L x 16 000 + 100 L x 14 200 = savdo 2 995 000, kutilgan 2 990 000, farq 0"
+                $smenaNusxa = $null
+                for ($i = 0; $i -lt 60 -and -not $smenaNusxa; $i++) {
+                    $smenaNusxa = Get-ChildItem $zaxPapka -Filter "fuelcontrol-*-smena$($sm2.id).db" -ErrorAction SilentlyContinue | Select-Object -First 1
+                    if (-not $smenaNusxa) { Start-Sleep -Milliseconds 500 }
+                }
+                Check ($null -ne $smenaNusxa) "smena yopilgach fonda zaxira nusxa olindi: $($smenaNusxa.Name)"
+                if ($smenaNusxa) {
+                    $bosh16 = [byte[]]::new(16); $fs = [IO.File]::OpenRead($smenaNusxa.FullName); try { [void] $fs.Read($bosh16, 0, 16) } finally { $fs.Dispose() }
+                    Check (([Text.Encoding]::ASCII.GetString($bosh16, 0, 15) -eq 'SQLite format 3') -and ($smenaNusxa.Length -gt 0)) "nusxa haqiqiy SQLite bazasi ($($smenaNusxa.Length) bayt)"
+                    Check (@(Get-ChildItem $zaxPapka -Filter 'fuelcontrol-*.db').Count -eq $fayllar0 + 1) "smena yopilganda aynan bitta nusxa olindi (jami $($fayllar0 + 1) ta)"
+                    $tgH = $null
+                    for ($i = 0; $i -lt 40; $i++) { $tgH = (Get-Json $p4 $tk '/zaxira/holat').telegram; if ($tgH.oxirgiTuri -eq 'nusxa') { break }; Start-Sleep -Milliseconds 500 }
+                    Check (($tgH.oxirgiTuri -eq 'nusxa') -and ($tgH.oxirgiMuvaffaqiyat -eq $false) -and ($tgH.oxirgiXabar -match [regex]::Escape($smenaNusxa.Name)) -and ($tgH.oxirgiXabar -notmatch 'AAHdq')) "nusxa Telegram'ga yuborishga urindi (soxta token): holatda xato, fayl nomi bor, token yo'q: [$($tgH.oxirgiXabar)]"
+                }
 
-                # --- Spec 8.16: pult krugi. 5-aparat pulti 10 000 da 0 ga qaytadi; krug hajmi faqat ko'rinish sozlamasi, hisob umumiy litrda qoladi ---
-                $krTana = @{ raqam = 5; yoqilgiTuriId = $a[1].yoqilgiTuriId }
-                $kr400 = Put-Xato $p4 $tk "/aparatlar/$($a[1].id)" ($krTana + @{ krugHajmi = [decimal]-1 })
-                $aKrug0 = @(Get-Json $p4 $tk '/aparatlar')
-                Check (($kr400.Kod -eq 400) -and ($null -eq $aKrug0[1].krugHajmi)) "krug hajmi manfiy -> 400 (kod $($kr400.Kod)), aparat o'zgarmadi"
-                $kr1 = Put-Json $p4 $tk "/aparatlar/$($a[1].id)" ($krTana + @{ krugHajmi = [decimal]10000 })
-                Check (([decimal]$kr1.krugHajmi -eq [decimal]10000) -and ([decimal]$kr1.totalLitr -eq [decimal]19930.52) -and ([decimal]$kr1.bakQoldiq -eq [decimal]10150)) "5-aparatga krug 10 000 L yoqildi (smena ochiq turganda ham mumkin): total va bak o'zgarmadi"
-                $kr2 = Put-Json $p4 $tk "/aparatlar/$($a[1].id)" $krTana
-                Check ([decimal]$kr2.krugHajmi -eq [decimal]10000) "eski klient krugHajmi maydonisiz yuborsa krug o'chib qolmaydi (10 000 joyida)"
-                $aKrug = @(Get-Json $p4 $tk '/aparatlar')
-                Check (($null -eq $aKrug[0].krugHajmi) -and ([decimal]$aKrug[1].krugHajmi -eq [decimal]10000)) "GET /aparatlar: 4-aparat krug yo'q, 5-aparat krug 10 000"
-                $ak = @(Get-Json $p4 $tk '/audit?q=krug')
-                Check (($ak.Count -eq 1) -and ($ak[0].amal -eq "Aparat o'zgartirildi") -and ($ak[0].tur -eq 'sozlama') -and ($ak[0].tafsilot -eq "5-aparat $nuqta yoqilg'i Sinov AI-95 $nuqta krug 10 000 L")) "audit: 'Aparat o'zgartirildi' - 5-aparat, yoqilg'i Sinov AI-95, krug 10 000 L (tur sozlama); o'zgarmagan so'rovlar audit yozmadi"
-                Check ((Count-Json $p4 $tk '/audit') -eq ($auditEski + 3)) "audit yozuvlari soni $($auditEski + 2) -> $($auditEski + 3)"
+                # appsettings.Local.json orqali papka (mijozda E:\baza): yaratiladi va nusxa shu yerga tushadi; yozib bo'lmasa standart papkaga.
+                $localJson = "$app6\Server\appsettings.Local.json"
+                $kopPapka = "$T\baza\ichki"
+                $mahalliy = { param($papka) @{ Zaxira = @{ Papka = $papka; Shoxobcha = 'E2E shoxobcha' } } | ConvertTo-Json | Set-Content -LiteralPath $localJson -Encoding utf8NoBOM }
+                Stop-Api
+                & $mahalliy $kopPapka
+                $up2 = Start-Api $app6 $p4
+                Check $up2 "API appsettings.Local.json (Zaxira:Papka = $kopPapka) bilan qayta ishga tushdi"
+                if ($up2) {
+                    $tk2 = (Login $p4 $eskiParol).token
+                    $z1 = Post-Json $p4 $tk2 '/zaxira' @{}
+                    Check (($z1.papka -eq $kopPapka) -and ($z1.standartPapkaga -eq $false) -and ($z1.sabab -eq 'qolda') -and (Test-Path -LiteralPath (Join-Path $kopPapka $z1.faylNomi))) "Local.json papkasi (E:\baza kabi) yaratildi va qo'lda nusxa shu yerga tushdi: $($z1.faylNomi)"
+                    $h2 = Get-Json $p4 $tk2 '/zaxira/holat'
+                    Check (($h2.papka -eq $kopPapka) -and ($h2.standartPapkaga -eq $false) -and (@($h2.nusxalar | Where-Object { $_.standartPapkada }).Count -eq $zaxEski.Count + 1) -and (@($h2.nusxalar | Where-Object { -not $_.standartPapkada }).Count -eq 1)) "holat: nusxalar ro'yxati ikkala papkadan ($($zaxEski.Count) eski + 1 smena nusxasi standart papkada, 1 yangi sozlangan papkada)"
+                    Check (($h2.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($h2.telegram.faol -eq $true)) "API qayta ishga tushgach Telegram tokeni joyida (...Dsaw), faol"
 
-                # Smena yopiladi. 4-aparat: segmentsiz - butun 100 L yangi narxda (16 000). 5-aparat krugdan o'tadi: oldingi total 19 930.52 (krug 2, pult 9 930.52),
-                # operator pultda 30.52 ni ko'radi (pult 0 dan qayta boshlangan, krug 3). Klient umumiy litrga o'giradi (docs 8.16): p < pB -> kB x H + p.
-                $H = [decimal]10000; $B = [decimal]$a1[1].totalLitr; $pult = [decimal]30.52
-                $kB = [math]::Floor($B / $H) + 1; $pB = $B - ($kB - 1) * $H
-                $umumiy = if ($pult -ge $pB) { ($kB - 1) * $H + $pult } else { $kB * $H + $pult }
-                Check (($kB -eq 2) -and ($pB -eq [decimal]9930.52) -and ($umumiy -eq [decimal]20030.52) -and (($umumiy - $B) -eq [decimal]100)) "krug o'girish: oldingi 19 930.52 = krug 2, pult 9 930.52; pultda 30.52 (p < pB) -> umumiy 20 030.52, sotilgan 100 L, krug 3"
-                $kors2 = @(@{ aparatId = $a1[0].id; qiymat = [decimal]109897.58 }, @{ aparatId = $a1[1].id; qiymat = $umumiy })
-                $xato = Post-Xato $p4 $tk "/smenalar/$($sm2.id)/yop" @{ korsatkichlar = $kors2; terminal = 125000; depozit = 320000; sanalganNaqd = 3015000; izoh = $null; plastikSummalari = @(60000, 60000) }
-                Check (($xato.Kod -eq 400) -and ($xato.Matn -match 'Plastik summalari') -and ((Get-Json $p4 $tk '/smenalar/joriy').smena.id -eq $sm2.id)) "plastik qismlari yig'indisi terminalga teng emas -> 400 (kod $($xato.Kod)), smena ochiq qoldi"
-                $yop2 = Post-Json $p4 $tk "/smenalar/$($sm2.id)/yop" @{ korsatkichlar = $kors2; terminal = 125000; depozit = 320000; sanalganNaqd = 3015000; izoh = $null; plastikSummalari = @(60000, 65000) }
-                Check (($yop2.savdo -eq 3020000) -and ($yop2.plastik -eq 55000) -and ($yop2.depozitFarqi -eq 20000) -and ($yop2.nasiyaJami -eq 40000) -and ($yop2.qaytganNasiya -eq 30000) -and ($yop2.kutilgan -eq 3015000) -and ($yop2.farq -eq 0)) "smena krugdan o'tib yopildi, farq 0: qaytim 80 000 + savdo 3 020 000 + qaytgan 30 000 - plastik 55 000 - depozit farqi 20 000 - nasiya 40 000 = kutilgan 3 015 000"
-                $d2 = Get-Json $p4 $tk "/smenalar/$($sm2.id)"
-                $g2 = @($d2.korsatkichlar)
-                Check (($null -ne $d2.smena.tugadi) -and ($g2.Count -eq 2) -and ($g2[0].aparatRaqam -eq 4) -and ([decimal]$g2[0].boshi -eq [decimal]109797.58) -and ([decimal]$g2[0].oxiri -eq [decimal]109897.58) -and ($g2[0].narx -eq 16000) -and ($g2[0].summa -eq 1600000) -and ($g2[0].narxOzgarishida -eq $false) -and ($g2[1].aparatRaqam -eq 5) -and ([decimal]$g2[1].boshi -eq [decimal]19930.52) -and ([decimal]$g2[1].oxiri -eq [decimal]20030.52) -and ($g2[1].narx -eq 14200) -and ($g2[1].summa -eq 1420000)) "yopilgan smena tafsiloti: 4-aparat butun 100 L yangi narxda (16 000 -> 1 600 000), 5-aparat 19 930.52 -> 20 030.52 (umumiy litr) x 14 200 = 1 420 000"
-                Check ((($d2.smena.plastikSummalari -join ',') -eq '60000,65000') -and (@($d2.nasiyalar).Count -eq 1) -and ($d2.nasiyalar[0].summa -eq 40000) -and (@($d2.qaytishlar).Count -eq 1)) "yopilgan smena: plastik qismlari 60 000 + 65 000, nasiyalar ro'yxati NasiyaJami bilan mos (40 000), 1 ta qaytish"
+                    Stop-Api
+                    $fayl = "$T\fayl.txt"; Set-Content -LiteralPath $fayl -Value 'x'
+                    $buzuk = "$fayl\baza"
+                    & $mahalliy $buzuk
+                    $up3 = Start-Api $app6 $p4
+                    Check $up3 "API yozib bo'lmaydigan Zaxira:Papka bilan ishga tushdi (disk ulanmagan holat)"
+                    if ($up3) {
+                        $tk3 = (Login $p4 $eskiParol).token
+                        $z2 = Post-Json $p4 $tk3 '/zaxira' @{}
+                        Check (($z2.standartPapkaga -eq $true) -and ($z2.papka -eq $zaxPapka) -and (Test-Path -LiteralPath (Join-Path $zaxPapka $z2.faylNomi))) "papka yozilmaganda nusxa standart papkaga tushdi: $($z2.faylNomi)"
+                        $h3 = Get-Json $p4 $tk3 '/zaxira/holat'
+                        Check (($h3.standartPapkaga -eq $true) -and ($h3.papka -eq $zaxPapka) -and ($h3.sozlanganPapka -eq $buzuk) -and ($h3.standartPapkaSababi -match 'fayl\.txt')) "holatda ogohlantirish: sozlangan papka ishlamayapti ($($h3.standartPapkaSababi))"
+                        $logMatn = Log-Matni "$data6\logs"
+                        Check (($logMatn -match 'Zaxira papkasi ishlamayapti') -and ($logMatn -notmatch 'AAHdq')) "logda papka ogohlantirishi bor, token yo'q"
+                    }
+
+                    # Yangilash (qayta o'rnatish) paytida appsettings.Local.json va Telegram tokeni saqlanadi.
+                    Stop-Api
+                    & $mahalliy $kopPapka
+                    $jwt0 = (Json "$app6\Server\appsettings.Production.json").Jwt.Kalit
+                    $code = Run-Setup ($baza + $tasks8) 'new-reinstall'
+                    Check ($code -eq 0) "yangilash (qayta o'rnatish) tugadi (kod $code)"
+                    Check ((Test-Path -LiteralPath $localJson) -and ((Json $localJson).Zaxira.Papka -eq $kopPapka)) "yangilashdan keyin appsettings.Local.json joyida"
+                    $up4 = Start-Api $app6 $p4
+                    Check $up4 "yangilashdan keyin API ishga tushdi"
+                    if ($up4) {
+                        $tk = (Login $p4 $eskiParol).token
+                        $op = Login $p4 $opParol $opLogin
+                        $h4 = Get-Json $p4 $tk '/zaxira/holat'
+                        Check (($h4.papka -eq $kopPapka) -and ($h4.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($h4.telegram.chatId -eq $tgChat) -and ($h4.telegram.faol -eq $true)) "yangilashdan keyin: Local.json papkasi va Telegram tokeni joyida (...Dsaw)"
+                    }
+                }
                 $a3 = @(Get-Json $p4 $tk '/aparatlar')
-                Check (([decimal]$a3[0].totalLitr -eq [decimal]109897.58) -and ([decimal]$a3[0].bakQoldiq -eq [decimal]4917.83) -and ($null -eq $a3[0].krugHajmi) -and ([decimal]$a3[1].totalLitr -eq [decimal]20030.52) -and ([decimal]$a3[1].bakQoldiq -eq [decimal]10050) -and ([decimal]$a3[1].krugHajmi -eq [decimal]10000)) "aparatlar yopilgach: 4 - total 109897.58, bak 4917.83; 5 - total 20030.52 (krug 3, pult 30.52), bak 10050.00, krug 10 000 joyida"
+                Check (($a3.Count -eq 2) -and ([decimal]$a3[0].totalLitr -eq [decimal]109897.58) -and ([decimal]$a3[0].bakQoldiq -eq [decimal]4917.83) -and ($null -eq $a3[0].krugHajmi) -and ([decimal]$a3[1].totalLitr -eq [decimal]20030.52) -and ([decimal]$a3[1].bakQoldiq -eq [decimal]10050) -and ([decimal]$a3[1].krugHajmi -eq 10000)) "aparatlar smena yopilgach: 4 - total 109897.58 / bak 4917.83; 5 - total 20030.52 / bak 10050.00, krug 10 000 joyida"
                 $h = Get-Json $p4 $tk '/hisobot'
                 Check (($h.jami.nasiya -eq 240000) -and ($h.jami.qaytganNasiya -eq 30000) -and ($h.eskiQarzQaytgan -eq 0)) "hisobot ochiladi: nasiya 240 000 (200 000 + 40 000), qaytgan 30 000, eski qarz 0"
                 if ($op) {
@@ -655,21 +686,29 @@ try {
         # Tuzatish, krug va yopish faqat Aparatlar, Smenalar, SmenaKorsatkichlari va Audit'ga tegadi; qolgan hamma jadval (eski ustunlari) qiymatigacha bir xil.
         $ozgargan = (@($izEski.Keys | Where-Object { $_ -ne '__EFMigrationsHistory' -and $izEski[$_] -ne $izOxiri[$_] }) | Sort-Object) -join ', '
         Check ($ozgargan -eq 'Aparatlar, Audit, SmenaKorsatkichlari, Smenalar') "faqat kutilgan jadvallar o'zgardi (aparatlar, audit, smena segmentlari, smenalar): $ozgargan"
-        $yakuniy = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 4; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3 }
+        $yakuniy = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 5; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3 }
         $nomos = @($yakuniy.Keys | Where-Object { (Iz-Soni $izOxiri $_) -ne $yakuniy[$_] })
-        Check ($nomos.Count -eq 0) "yakuniy qatorlar soni: foydalanuvchilar 3, aparatlar 2, bak kirimi 1, smena segmentlari 4 (yopilgan smenada 2 + 2), nasiyalar 2, harakatlar 3$(if ($nomos.Count) { ' - mos kelmadi: ' + ($nomos -join ', ') })"
+        Check ($nomos.Count -eq 0) "yakuniy qatorlar soni: foydalanuvchilar 3, aparatlar 2, bak kirimi 1, smena segmentlari 5 (birinchi smenada 2, ikkinchisida 3), nasiyalar 2, harakatlar 3$(if ($nomos.Count) { ' - mos kelmadi: ' + ($nomos -join ', ') })"
         $audTurOxiri = Sql-Qatorlar $dbFayl 'SELECT Tur, COUNT(*) FROM Audit GROUP BY Tur ORDER BY Tur'
         $tEski = @{}; foreach ($qt in $audTurEski) { $tEski[$qt.Split('|')[0]] = [int] $qt.Split('|')[1] }
         $tYangi = @{}; foreach ($qt in $audTurOxiri) { $tYangi[$qt.Split('|')[0]] = [int] $qt.Split('|')[1] }
         $tFarq = (@(@($tEski.Keys) + @($tYangi.Keys) | Select-Object -Unique | Sort-Object | Where-Object { [int]$tYangi[$_] -ne [int]$tEski[$_] } | ForEach-Object { '{0} {1:+#;-#}' -f $_, ([int]$tYangi[$_] - [int]$tEski[$_]) })) -join ', '
-        Check (((Iz-Soni $izOxiri 'Audit') -eq ($auditEski + 4)) -and ($tFarq -eq 'smena +1, sozlama +1, tuzatish +2')) "audit yozuvlari $auditEski -> $($auditEski + 4): 'Ko'rsatkich tuzatildi' 2 ta, 'Aparat o'zgartirildi' (krug) 1 ta va 'Smena yopildi' 1 ta qo'shildi ($tFarq)"
+        Check (((Iz-Soni $izOxiri 'Audit') -eq ($auditEski + 4)) -and ($tFarq -eq 'smena +1, sozlama +3')) "audit yozuvlari $auditEski -> $($auditEski + 4): 'Smena yopildi' 1 ta, 'Telegram sozlandi' 1 ta va 'Zaxira nusxa olindi' 2 ta qo'shildi (smena +1, sozlama +3)"
         $smQ = Sql-Qatorlar $dbFayl "SELECT NasiyaJami, QaytganNasiya, XarajatJami, Savdo, Plastik, DepozitFarqi, Kutilgan, Farq, PlastikSummalari FROM Smenalar WHERE Id = $($sm2.id)"
-        Check (($smQ.Count -eq 1) -and ($smQ[0] -eq '40000|30000|0|3020000|55000|20000|3015000|0|60000,65000')) "yopilgan smena yig'indilari bazada: nasiya 40 000, qaytgan 30 000, savdo 3 020 000, plastik 55 000, depozit farqi 20 000, kutilgan 3 015 000, farq 0, plastik qismlari 60000,65000"
+        Check (($smQ.Count -eq 1) -and ($smQ[0] -eq '40000|30000|0|2995000|55000|20000|2990000|0|60000,65000')) "yopilgan smena yig'indilari bazada: nasiya 40 000, qaytgan 30 000, savdo 2 995 000, plastik 55 000, depozit farqi 20 000, kutilgan 2 990 000, farq 0, plastik qismlari 60000,65000"
         $sq = "SELECT COUNT(*) FROM SmenaKorsatkichlari WHERE SmenaId = $($sm2.id)"
-        $s4 = Sql-Qatorlar $dbFayl "$sq AND AparatId = $($apr.id) AND Tartib = 1 AND CAST(Boshi AS REAL) = 109797.58 AND CAST(Oxiri AS REAL) = 109897.58 AND Narx = 16000 AND CAST(Litr AS REAL) = 100 AND Summa = 1600000 AND NarxOzgarishida = 0"
+        $s4 = Sql-Qatorlar $dbFayl "$sq AND AparatId = $($apr.id) AND Tartib = 1 AND CAST(Boshi AS REAL) = 109797.58 AND CAST(Oxiri AS REAL) = 109847.58 AND Narx = 15500 AND CAST(Litr AS REAL) = 50 AND Summa = 775000 AND NarxOzgarishida = 1"
+        $s4b = Sql-Qatorlar $dbFayl "$sq AND AparatId = $($apr.id) AND Tartib = 2 AND CAST(Boshi AS REAL) = 109847.58 AND CAST(Oxiri AS REAL) = 109897.58 AND Narx = 16000 AND CAST(Litr AS REAL) = 50 AND Summa = 800000 AND NarxOzgarishida = 0"
         $s5 = Sql-Qatorlar $dbFayl "$sq AND AparatId = $($apr2.id) AND Tartib = 1 AND CAST(Boshi AS REAL) = 19930.52 AND CAST(Oxiri AS REAL) = 20030.52 AND Narx = 14200 AND CAST(Litr AS REAL) = 100 AND Summa = 1420000 AND NarxOzgarishida = 0"
         $sJami = Sql-Qatorlar $dbFayl $sq
-        Check (($s4[0] -eq '1') -and ($s5[0] -eq '1') -and ($sJami[0] -eq '2')) "yopilgan smena segmentlari bazada: faqat 2 ta (4-aparat 100 L x 16 000, 5-aparat 100 L x 14 200); noto'g'ri narx o'zgarishi segmenti qolmadi"
+        Check (($s4[0] -eq '1') -and ($s4b[0] -eq '1') -and ($s5[0] -eq '1') -and ($sJami[0] -eq '3')) "yopilgan smena segmentlari bazada: 4-aparat 50 L x 15 500 (narx o'zgarishi) + 50 L x 16 000, 5-aparat 100 L x 14 200"
+        $zSoz = Sql-Qatorlar $dbFayl "SELECT COUNT(*), SUM(TelegramTokenShifr LIKE 'dpapi1:%'), SUM(instr(TelegramTokenShifr, 'AAHdq') = 0 AND instr(TelegramTokenShifr, '123456789') = 0), MIN(TelegramChatId), MIN(TelegramYoqilgan) FROM ZaxiraSozlamalari"
+        Check ($zSoz[0] -eq '1|1|1|-1001234567890|1') "ZaxiraSozlamalari: bitta qator, token bazada DPAPI bilan shifrlangan (ochiq matn yo'q), chat ID, yoqilgan ($($zSoz[0]))"
+        $nuqtaB = [string][char] 0x00B7
+        $zAud = @(Sql-Qatorlar $dbFayl "SELECT Tafsilot FROM Audit WHERE Amal = 'Telegram sozlandi'")
+        Check (($zAud.Count -eq 1) -and ($zAud[0] -eq "token yangilandi $nuqtaB chat ID -1001234567890") -and ($zAud[0] -notmatch 'Dsaw|AAHdq')) "auditda Telegram sozlamasi: '$($zAud[0])' (tokenning belgisi yo'q)"
+        $zArx = @(Sql-Qatorlar $dbFayl "SELECT COUNT(*) FROM Audit WHERE Amal = 'Zaxira nusxa olindi'")
+        Check ($zArx[0] -eq '3') "auditda 'Zaxira nusxa olindi' 3 ta: eski versiyadagi 1 + yangi versiyadagi 2 (papka va standart papka)"
         $ap = Sql-Qatorlar $dbFayl "SELECT COUNT(*) FROM Aparatlar WHERE (Raqam = 4 AND CAST(TotalLitr AS REAL) = 109897.58 AND CAST(BakQoldiq AS REAL) = 4917.83 AND KrugHajmi IS NULL) OR (Raqam = 5 AND CAST(TotalLitr AS REAL) = 20030.52 AND CAST(BakQoldiq AS REAL) = 10050 AND CAST(KrugHajmi AS REAL) = 10000)"
         Check ($ap[0] -eq '2') "aparatlar bazada: 4 - total 109897.58, bak 4917.83, krug yo'q; 5 - total 20030.52, bak 10050.00, krug 10 000"
         $smena1Oxiri = Sql-Qatorlar $dbFayl "SELECT * FROM Smenalar WHERE Id = $($sm.id)"
@@ -691,6 +730,11 @@ try {
         if ($up) {
             Check ($null -ne (Login $p4 $eskiParol)) "eski admin paroli ishlaydi"
             Check ($null -eq (Login $p4 $yangiParol)) "yangi parol ISHLAMAYDI (toza o'rnatish uchun ma'lumot papkasini o'chirish shart)"
+            $rb = Login $p4 $eskiParol
+            $hb = if ($rb) { Get-Json $p4 $rb.token '/zaxira/holat' } else { $null }
+            $jwt1 = (Json "$app6\Server\appsettings.Production.json").Jwt.Kalit
+            Check ($hb -and ($hb.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($hb.telegram.chatId -eq $tgChat) -and ($hb.telegram.faol -eq $true)) "o'chirib qayta o'rnatishdan keyin ham Telegram tokeni va chat ID saqlandi (JWT kaliti $(if ($jwt1 -ne $jwt0) { 'yangilandi' } else { 'o''zgarmadi' }); ma'lumot papkasidagi baza o'z joyida)"
+            Check ($hb.papka -eq "$data6\zaxira") "o'chirilgan Local.json bilan zaxira papkasi standartga qaytdi: $data6\zaxira"
         }
         Stop-Api
         Uninstall-One $app6

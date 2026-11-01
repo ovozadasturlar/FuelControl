@@ -57,6 +57,10 @@ export type YoqilgiTahrirlashDto = S['YoqilgiTahrirlashDto'];
 export type YoqilgiTuriDto = S['YoqilgiTuriDto'];
 export type YoqilgiYaratishDto = S['YoqilgiYaratishDto'];
 export type ZaxiraJavobiDto = S['ZaxiraJavobiDto'];
+export type ZaxiraHolatiDto = S['ZaxiraHolatiDto'];
+export type ZaxiraNusxasiDto = S['ZaxiraNusxasiDto'];
+export type ZaxiraTelegramDto = S['ZaxiraTelegramDto'];
+export type ZaxiraTelegramTahrirDto = S['ZaxiraTelegramTahrirDto'];
 
 /** Audit turi (filtr): API'da oddiy satr. */
 export type AuditTuri = 'smena' | 'nasiya' | 'xarajat' | 'bak' | 'tuzatish' | 'hisob' | 'sozlama' | 'kirish';

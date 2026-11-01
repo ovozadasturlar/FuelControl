@@ -120,7 +120,7 @@ export class SozlamalarSahifa {
 
   protected readonly admin = computed(() => this.auth.bor('Sozlamalar'));
 
-  /** `?qism=aparatlar|yoqilgi` — shu bo'lim ochiladi (smena ochish uchun aparat yo'q bo'lganda Savdo/Boshqaruv'dan). */
+  /** `?qism=aparatlar|yoqilgi|zaxira` — shu bo'lim ochiladi (smena ochish uchun aparat yo'q bo'lganda Savdo/Boshqaruv'dan). */
   readonly qism = input<string | undefined>();
 
   protected readonly tillar: { kod: TilKodi; kalit: string }[] = [{ kod: 'uz', kalit: 'Lotin' }, { kod: 'uzk', kalit: 'Kirill' }, { kod: 'ru', kalit: 'Rus' }];
@@ -137,6 +137,7 @@ export class SozlamalarSahifa {
       const q = this.qism();
       if (q === 'aparatlar') untracked(() => this.tanla(1));
       else if (q === 'yoqilgi') untracked(() => this.tanla(0));
+      else if (q === 'zaxira') untracked(() => this.tanla(4));
     });
     effect(() => {
       const i = this.x.otish();

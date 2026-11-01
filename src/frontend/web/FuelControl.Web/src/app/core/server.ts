@@ -4,7 +4,7 @@ import type {
   AparatDto, AparatTahrirlashDto, AparatYaratishDto, AuditYozuviDto, BakKirimDto, BakKirimYaratishDto, BoshqaruvDto, FoydalanuvchiDto,
   EskiQarzYaratishDto, FoydalanuvchiTahrirlashDto, HisobotDto, HisobotGuruhi, KorsatkichTuzatishDto, LoginJavobi, NarxTarixiDto, NasiyaDto, NasiyalarDto,
   NasiyaQaytishiYaratishDto, MijozTaklifDto, NasiyaTafsilotDto, NasiyaYaratishDto, OperatorHisobDto, Rol, Ruxsat, SmenaDto, SmenaOchishDto, SmenaTafsilotDto,
-  SmenaTopshirishDto, SmenaYopishDto, XarajatDto, XarajatYaratishDto, YoqilgiTahrirlashDto, YoqilgiTuriDto, ZaxiraJavobi,
+  SmenaTopshirishDto, SmenaYopishDto, XarajatDto, XarajatYaratishDto, YoqilgiTahrirlashDto, YoqilgiTuriDto, ZaxiraHolatiDto, ZaxiraJavobi, ZaxiraTelegramTahrirDto,
 } from '../api/model';
 
 /**
@@ -99,4 +99,9 @@ export class Server {
   async pinOrnat(id: number, pin: string): Promise<void> { await ol(api.POST('/foydalanuvchilar/{id}/pin', { params: { path: { id } }, body: { yangiParolYokiPin: pin } })); }
   ruxsatlarniOrnat(id: number, ruxsatlar: Ruxsat[]): Promise<FoydalanuvchiDto> { return ol(api.PUT('/foydalanuvchilar/{id}/ruxsatlar', { params: { path: { id } }, body: { ruxsatlar } })); }
   zaxira(): Promise<ZaxiraJavobi> { return ol(api.POST('/zaxira')); }
+  zaxiraHolati(): Promise<ZaxiraHolatiDto> { return ol(api.GET('/zaxira/holat')); }
+  /** token / chatId: null = o'zgarmaydi, "" = o'chirish; yoqilgan: null = o'zgarmaydi. Javob — yangilangan holat. */
+  zaxiraTelegramSaqla(d: ZaxiraTelegramTahrirDto): Promise<ZaxiraHolatiDto> { return ol(api.PUT('/zaxira/telegram', { body: d })); }
+  /** Yuborilmasa ham 200 (oxirgiMuvaffaqiyat=false + matn); 400 faqat token yoki chat ID yo'q bo'lganda. */
+  zaxiraSinov(): Promise<ZaxiraHolatiDto> { return ol(api.POST('/zaxira/telegram/sinov')); }
 }

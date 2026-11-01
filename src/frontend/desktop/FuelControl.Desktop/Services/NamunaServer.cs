@@ -228,7 +228,11 @@ public sealed class NamunaServer : INamunaServer
             case "smenalar" when s[1] == "och":
                 return SmenaOch((SmenaOchishDto)tana!);
             case "smenalar" when s.Length == 3 && s[2] == "yop":
-                return SmenaYop(int.Parse(s[1]), (SmenaYopishDto)tana!);
+            {
+                var yopildi = SmenaYop(int.Parse(s[1]), (SmenaYopishDto)tana!);
+                ZaxiraOl("smena", yopildi.Id);   // §8.17: smena yopilganda nusxa
+                return yopildi;
+            }
             case "smenalar" when usul == HttpMethod.Put && s.Length == 3 && s[2] == "narx-korsatkichi":
                 return NarxKorsatkichiniTuzat(int.Parse(s[1]), (KorsatkichTuzatishDto)tana!);
             case "nasiyalar" when get && s.Length == 2 && s[1] == "mijozlar":
@@ -274,6 +278,14 @@ public sealed class NamunaServer : INamunaServer
                 return new List<BakKirimDto>();
             case "audit" when s.Length == 1:
                 return _audit.Where(a => !q.TryGetValue("tur", out var t) || a.Tur == t).ToList();
+            case "zaxira" when usul == HttpMethod.Post && s.Length == 1:
+                return ZaxiraOl("qolda", null);
+            case "zaxira" when get && s.Length == 2 && s[1] == "holat":
+                return ZaxiraHolati();
+            case "zaxira" when usul == HttpMethod.Put && s.Length == 2 && s[1] == "telegram":
+                return TelegramTahrir((ZaxiraTelegramTahrirDto)tana!);
+            case "zaxira" when usul == HttpMethod.Post && s.Length == 3 && s[1] == "telegram" && s[2] == "sinov":
+                return TelegramSinov();
             case "boshqaruv":
                 return Boshqaruv();
             case "hisobot":
@@ -281,6 +293,80 @@ public sealed class NamunaServer : INamunaServer
             default:
                 return null;
         }
+    }
+
+    // ================= §8.17 Zaxira nusxa =================
+    /// <summary>Sinov uchun: true bo'lsa sozlangan papka (E:\baza) "ishlamaydi" — nusxalar standart papkaga tushadi.</summary>
+    public bool ZaxiraPapkaIshlamaydi { get; set; }
+    private const string SozlanganPapka = @"E:\baza", StandartPapka = @"C:\ProgramData\FuelControl\zaxira";
+    private readonly List<ZaxiraNusxasiDto> _nusxalar = new();
+    private string? _tgToken, _tgChat;
+    private bool _tgYoqilgan;
+    private (DateTime Vaqt, bool Ok, string Xabar, string Turi)? _tgOxirgi;
+    private bool TgFaol => _tgYoqilgan && _tgToken is not null && _tgChat is not null;
+
+    private void ZaxiraNamunasi()
+    {
+        var b = _bugun;
+        foreach (var (kun, soat, sabab, smena, hajm) in new (int, int, string, int?, long)[]
+                 { (0, 8, "smena", 41, 2_318_336), (-1, 3, "kunlik", null, 2_301_952), (-1, 8, "smena", 40, 2_297_856), (-2, 3, "kunlik", null, 2_289_664), (-9, 3, "", null, 1_912_832) })
+        {
+            var v = Utc(b.AddDays(kun), soat, 5);
+            _nusxalar.Add(new ZaxiraNusxasiDto($"fuelcontrol-{v.ToLocalTime():yyyyMMdd-HHmmss}{(sabab.Length > 0 ? "-" + sabab : "")}{(smena is { } n ? "-" + n : "")}.db",
+                v, hajm, sabab, smena, sabab.Length == 0));
+        }
+    }
+
+    private ZaxiraJavobiDto ZaxiraOl(string sabab, int? smenaId)
+    {
+        if (_nusxalar.Count == 0) ZaxiraNamunasi();
+        var v = DateTime.UtcNow;
+        var nomi = $"fuelcontrol-{v.ToLocalTime():yyyyMMdd-HHmmss}-{sabab}{(smenaId is { } n ? "-" + n : "")}.db";
+        var hajm = 2_318_336L + _nusxalar.Count * 4096;
+        _nusxalar.Insert(0, new ZaxiraNusxasiDto(nomi, v, hajm, sabab, smenaId, ZaxiraPapkaIshlamaydi));
+        if (_nusxalar.Count > 30) _nusxalar.RemoveRange(30, _nusxalar.Count - 30);
+        if (sabab == "qolda") Audit(Ism(_joriyFoydalanuvchi), "Zaxira nusxa olindi", nomi, "zaxira");
+        var yuboriladi = TgFaol;
+        if (yuboriladi) _tgOxirgi = _tgChat == "-1"
+            ? (v, false, "Bad Request: chat not found", "nusxa")
+            : (v, true, $"{nomi}.gz · {hajm / 3 / 1024} KB", "nusxa");
+        return new ZaxiraJavobiDto(nomi, hajm, v, sabab, ZaxiraPapkaIshlamaydi ? StandartPapka : SozlanganPapka, ZaxiraPapkaIshlamaydi, yuboriladi);
+    }
+
+    private ZaxiraHolatiDto ZaxiraHolati()
+    {
+        if (_nusxalar.Count == 0) ZaxiraNamunasi();
+        var o = _tgOxirgi;
+        var maska = _tgToken is { } t ? "…" + t[^4..] : null;
+        return new ZaxiraHolatiDto(ZaxiraPapkaIshlamaydi ? StandartPapka : SozlanganPapka, SozlanganPapka, ZaxiraPapkaIshlamaydi,
+            ZaxiraPapkaIshlamaydi ? "disk ulanmagan" : null, 30, _nusxalar.ToArray(),
+            new ZaxiraTelegramDto(_tgYoqilgan, TgFaol, maska, _tgChat, o?.Vaqt, o?.Ok, o?.Xabar, o?.Turi));
+    }
+
+    private ZaxiraHolatiDto TelegramTahrir(ZaxiraTelegramTahrirDto d)
+    {
+        if (d.Token is { Length: > 0 } t && !System.Text.RegularExpressions.Regex.IsMatch(t, @"^\d{5,}:[A-Za-z0-9_-]{20,}$"))
+            throw Xato("Bot tokeni noto'g'ri formatda (masalan 123456789:AAH...)");
+        if (d.ChatId is { Length: > 0 } c && !System.Text.RegularExpressions.Regex.IsMatch(c, @"^(-?\d+|@[A-Za-z0-9_]{4,})$"))
+            throw Xato("Chat ID noto'g'ri: son (guruhda manfiy) yoki @kanal bo'lishi kerak");
+        if (d.Token is not null)
+        {
+            Audit(Ism(_joriyFoydalanuvchi), d.Token.Length == 0 ? "Telegram tokeni o'chirildi" : "Telegram tokeni o'zgartirildi", "", "sozlama");
+            _tgToken = d.Token.Length == 0 ? null : d.Token;
+        }
+        if (d.ChatId is not null) _tgChat = d.ChatId.Length == 0 ? null : d.ChatId;
+        if (d.Yoqilgan is { } y) _tgYoqilgan = y;
+        return ZaxiraHolati();
+    }
+
+    private ZaxiraHolatiDto TelegramSinov()
+    {
+        if (_tgToken is null) throw Xato("Bot tokeni kiritilmagan");
+        if (_tgChat is null) throw Xato("Chat ID kiritilmagan");
+        _tgOxirgi = _tgChat == "-1"
+            ? (DateTime.UtcNow, false, "Bad Request: chat not found", "sinov")
+            : (DateTime.UtcNow, true, "Sinov xabari", "sinov");
+        return ZaxiraHolati();
     }
 
     private SmenaDto SmenaOch(SmenaOchishDto d)

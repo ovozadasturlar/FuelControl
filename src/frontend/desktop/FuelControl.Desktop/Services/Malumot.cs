@@ -507,6 +507,20 @@ public static class Malumot
         return z;
     }
 
+    /// <summary>§8.17: zaxira papkasi, oxirgi nusxalar va Telegram holati (keshlanmaydi — Zaxira tabi ochilganda so'raladi).</summary>
+    public static async Task<ZaxiraHolatiDto> ZaxiraHolati() => (await Api.ZaxiraHolati())!;
+
+    /// <summary>Telegram sozlamalari: Token null — o'zgarmaydi, "" — o'chiriladi. Token o'zgarishi auditga yoziladi.</summary>
+    public static async Task<ZaxiraHolatiDto> ZaxiraTelegram(ZaxiraTelegramTahrirDto d)
+    {
+        var h = (await Api.ZaxiraTelegram(d))!;
+        await JimYukla(Bolim.Audit);
+        return h;
+    }
+
+    /// <summary>Sinov xabari: yuborilmasa ham 200 — natija Telegram.OxirgiMuvaffaqiyat/OxirgiXabar'da.</summary>
+    public static async Task<ZaxiraHolatiDto> ZaxiraTelegramSinov() => (await Api.ZaxiraTelegramSinov())!;
+
     // ================= DTO → model =================
 
     /// <summary>Ro'yxatni server javobiga moslaydi: borini joyida yangilaydi, yangisini qo'shadi, yo'qini olib tashlaydi.</summary>

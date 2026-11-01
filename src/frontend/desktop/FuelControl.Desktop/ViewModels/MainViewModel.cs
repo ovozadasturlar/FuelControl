@@ -85,6 +85,7 @@ public partial class MainViewModel : ObservableObject
         nameof(HisobotSahifasi), nameof(OperatorlarSahifasi), nameof(SozlamalarSahifasi), nameof(AuditSahifasi))]
     private int _sahifa;
 
+    partial void OnSahifaChanged(int value) { if (value == SSozlamalar) Sozlamalar.SahifaOchildi(); }
     public bool BoshqaruvSahifasi => Sahifa == SBoshqaruv;
     public bool SavdoSahifasi => Sahifa == SSavdo;
     public bool SmenalarSahifasi => Sahifa == SSmenalar;

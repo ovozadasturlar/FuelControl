@@ -48,10 +48,31 @@ main {
   .banner { margin-left: 304px; }
   .yon {
     position: fixed; z-index: 30; top: 20px; bottom: 20px; left: 20px; width: 264px;
-    display: flex; flex-direction: column; gap: 2px; padding: 18px 14px 14px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 2px; padding: 18px 14px 14px; overflow: hidden;
     background: linear-gradient(160deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.46));
   }
+  /* Past oynada: faqat menyu ro'yxati qisqaradi va skroll qiladi; qolgan bloklar o'z o'lchamida qoladi.
+     Aktiv bandning soyasi qattiq kesilmasin deb pastki 14 px yumshoq so'nadi (mask). */
+  .yon > * { flex: none; }
+  .yon > .menyu {
+    flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    padding: 4px 8px 14px; margin: -4px -8px 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
+  }
+  .yon > .bosh-joy { flex: 1 1 0; min-height: 0; }
   :host-context(:root[data-theme="dark"]) .yon { background: var(--karta-fon); }
+}
+@media (min-width: 900px) and (max-height: 760px) {
+  .yon { top: 12px; bottom: 12px; padding: 12px 12px 10px; }
+  .brend { padding-bottom: 8px; }
+  .logo { width: 36px; height: 36px; border-radius: 12px; }
+  .nav { min-height: 40px; margin: 0; }
+  .til-tugma { min-height: 40px; }
+  .tema-tugma { margin-top: 6px; min-height: 40px; }
+  .men { margin-top: 6px; padding-top: 5px; padding-bottom: 5px; }
+  .chiqish { width: 40px; height: 40px; }
+  .holat { padding-top: 8px; }
+  .versiya { padding-top: 2px; }
 }
 @media (min-width: 900px) and (prefers-color-scheme: dark) {
   :host-context(:root:not([data-theme="light"])) .yon { background: var(--karta-fon); }

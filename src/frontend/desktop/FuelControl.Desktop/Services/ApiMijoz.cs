@@ -135,6 +135,9 @@ public sealed class ApiMijoz
         Ol<List<AuditYozuviDto>>("audit" + Sorov(("limit", limit), ("tur", tur), ("q", string.IsNullOrWhiteSpace(q) ? null : q.Trim()), ("dan", dan), ("gacha", gacha)));
     public Task AuditEksport(AuditEksportDto d) => Yubor<object>(HttpMethod.Post, "audit/eksport", d);
     public Task<ZaxiraJavobiDto?> Zaxira() => Yubor<ZaxiraJavobiDto>(HttpMethod.Post, "zaxira", null);
+    public Task<ZaxiraHolatiDto?> ZaxiraHolati() => Ol<ZaxiraHolatiDto>("zaxira/holat");
+    public Task<ZaxiraHolatiDto?> ZaxiraTelegram(ZaxiraTelegramTahrirDto d) => Yubor<ZaxiraHolatiDto>(HttpMethod.Put, "zaxira/telegram", d);
+    public Task<ZaxiraHolatiDto?> ZaxiraTelegramSinov() => Yubor<ZaxiraHolatiDto>(HttpMethod.Post, "zaxira/telegram/sinov", null);
 
     // ---------- Boshqaruv / hisobot (serverda hisoblanadi) ----------
     public Task<BoshqaruvDto?> Boshqaruv() => Ol<BoshqaruvDto>("boshqaruv");

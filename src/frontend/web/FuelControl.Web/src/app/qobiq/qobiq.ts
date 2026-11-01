@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { Auth } from '../core/auth';
@@ -28,6 +28,7 @@ export class Qobiq {
   protected readonly tema = inject(Tema);
   protected readonly aloqa = inject(Aloqa);
   private readonly server = inject(Server);
+  private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly tillar: { kod: TilKodi; nom: string }[] = [{ kod: 'uz', nom: 'UZ' }, { kod: 'uzk', nom: 'ЎЗ' }, { kod: 'ru', nom: 'RU' }];
   /** Yon menyu: Sozlamalar faqat ruxsat bilan; telefonda "Yana" varag'ida har kimga. */
@@ -54,11 +55,22 @@ export class Qobiq {
       if (this.yanaOchiq()) { this.yanaOrqaga.unut(); this.yanaOchiq.set(false); }
       const yol = (e as NavigationEnd).urlAfterRedirects.split('/')[1]?.split('?')[0] ?? '';
       this.yanaFaol.set(yol === 'sozlamalar' || yol === 'hisobim' || this.qolganlar().some((b) => b.yol === yol));
+      setTimeout(() => this.faolBandniKorsat(), 80);
     });
     // Ruxsatlar desktop'da o'zgargan bo'lishi mumkin.
     this.auth.yangila();
     this.belgiYangila();
     jonliYangila(() => this.belgiYangila(), (h) => h.turi === 'NasiyaOzgardi');
+  }
+
+  /** Past oynada menyu ro'yxati skroll qiladi: faol band ko'rinish oynasidan tashqarida bo'lsa, ro'yxat unga suriladi (sahifa skrolli o'zgarmaydi). */
+  private faolBandniKorsat() {
+    const m = this.el.nativeElement.querySelector<HTMLElement>('.yon .menyu');
+    const a = m?.querySelector<HTMLElement>('.nav.faol');
+    if (!m || !a || m.scrollHeight <= m.clientHeight) return;
+    const mr = m.getBoundingClientRect(), ar = a.getBoundingClientRect();
+    if (ar.bottom > mr.bottom - 14) m.scrollTop += ar.bottom - (mr.bottom - 14);
+    else if (ar.top < mr.top + 4) m.scrollTop -= mr.top + 4 - ar.top;
   }
 
   /** Menyudagi "Nasiyalar" belgisi — muddati o'tgan qarzlar soni. */

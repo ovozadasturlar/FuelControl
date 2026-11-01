@@ -182,26 +182,24 @@ public partial class SozlamalarViewModel : ObservableObject
     [ObservableProperty] private Foydalanuvchi? _tiklashF;
     [ObservableProperty] private string _yangiPin = "";
 
-    // ---- Zaxira
-    [ObservableProperty] private string _oxirgiNusxa = "";
-
     private string _yoqilgiImzo = "", _aparatImzo = "", _foydalanuvchiImzo = "", _narxImzo = "";
 
     public SozlamalarViewModel()
     {
-        OxirgiNusxa = Til.T("OxirgiNusxaIzoh");
         Sinxronla();
         Malumot.Ozgardi += Sinxronla;
         Navigatsiya.SozlamaBolimSorovi += b => Bolim = b;
         Malumot.AloqaOzgardi += () =>
         {
             foreach (var c in new IRelayCommand[] { NarxniSaqlaCommand, YoqilginiSaqlaCommand, YoqilginiOchirCommand, AparatniSaqlaCommand,
-                         FoydalanuvchiniSaqlaCommand, StandartRuxsatlarCommand, TiklashniSaqlaCommand, HozirNusxaCommand })
+                         FoydalanuvchiniSaqlaCommand, StandartRuxsatlarCommand, TiklashniSaqlaCommand, HozirNusxaCommand,
+                         TelegramniSaqlaCommand, TokenniOchirCommand, SinovYuborCommand })
                 c.NotifyCanExecuteChanged();
         };
         Til.Ozgardi += () =>
         {
             Rollar = Enum.GetValues<Rol>().Select(r => new RolElementi { Rol = r }).ToList();
+            ZaxiraTilYangila();
             OnPropertyChanged(string.Empty);
         };
     }
@@ -277,6 +275,7 @@ public partial class SozlamalarViewModel : ObservableObject
     {
         foreach (var n in new[] { nameof(NarxlarBolimi), nameof(AparatlarBolimi), nameof(FoydalanuvchilarBolimi), nameof(RuxsatlarBolimi), nameof(ZaxiraBolimi) })
             OnPropertyChanged(n);
+        if (value == 4) _ = ZaxiraniYukla();
     }
 
     partial void OnRuxsatFoydalanuvchiChanged(Foydalanuvchi? value)
@@ -548,20 +547,4 @@ public partial class SozlamalarViewModel : ObservableObject
         }
         catch (ApiXatosi e) { Bildirish.Xato(e.Message); }
     }
-
-    // ================= Zaxira =================
-    /// <summary>Server bazasidan zaxira nusxa (VACUUM INTO) — fayl serverda, /data/zaxira papkasida.</summary>
-    [RelayCommand(CanExecute = nameof(AloqaBor))]
-    private async Task HozirNusxa()
-    {
-        try
-        {
-            var z = await Malumot.Zaxira();
-            OxirgiNusxa = $"{Til.T("Bugun")} {z.Vaqt.ToLocalTime():HH:mm} · {z.FaylNomi} · {z.HajmBayt / 1024} KB · {Til.T("Muvaffaqiyatli")}";
-        }
-        catch (ApiXatosi e) { Bildirish.Xato(e.Message); }
-    }
-
-    [RelayCommand]
-    private void PapkaniOch() => Bildirish.Malumot(Til.T("ZaxiraServerda"));
 }

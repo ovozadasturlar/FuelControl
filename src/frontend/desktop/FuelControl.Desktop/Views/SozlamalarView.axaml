@@ -350,32 +350,105 @@
                 </Border>
             </Grid>
 
-            <!-- Zaxira -->
-            <Border Classes="card" IsVisible="{Binding ZaxiraBolimi}" MaxWidth="700" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="{l:T ZaxiraNusxa}" Classes="kichikSarlavha" />
-                    <Border Classes="tile">
-                        <Grid ColumnDefinitions="*,Auto">
+            <!-- Zaxira (§8.17) -->
+            <StackPanel IsVisible="{Binding ZaxiraBolimi}" Spacing="16" MaxWidth="760" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Border Classes="card">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{l:T ZaxiraNusxa}" Classes="kichikSarlavha" />
+                        <TextBlock Text="{Binding ZaxiraXato}" Classes="xatoMatn" IsVisible="{Binding ZaxiraXatoBor}" />
+                        <Border Classes="tile">
                             <StackPanel Spacing="2">
-                                <TextBlock Text="{l:T AvtomatikNusxa}" FontWeight="SemiBold" />
-                                <TextBlock Text="{l:T NusxaIzoh}" Classes="izoh" TextWrapping="Wrap" />
-                            </StackPanel>                        </Grid>
-                    </Border>
-                    <Border Classes="tile">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="{l:T OxirgiNusxa}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding OxirgiNusxa}" Classes="izoh" />
+                                <TextBlock Text="{l:T Zaxira_Papka}" FontWeight="SemiBold" />
+                                <SelectableTextBlock x:Name="ZaxiraPapkaMatn" Text="{Binding ZaxiraPapka}" FontSize="13" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ZaxiraQachon}" Classes="izoh" TextWrapping="Wrap" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="primary" Content="{l:T HozirNusxa}" Command="{Binding HozirNusxaCommand}" />
-                        </Grid>
-                    </Border>
-                    <WrapPanel ItemSpacing="8" LineSpacing="8">
-                        <Button Classes="ghost" Content="{l:T NusxadanTiklash}" Command="{Binding PapkaniOchCommand}" />
-                        <Button Classes="ghost" Content="{l:T PapkaniOchish}" Command="{Binding PapkaniOchCommand}" />
-                    </WrapPanel>
-                </StackPanel>
-            </Border>
+                        </Border>
+                        <Border x:Name="ZaxiraOgohQuti" Classes="ogoh" IsVisible="{Binding ZaxiraOgohBor}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                <ctl:Ikon Nomi="alert" Olcham="17" Rang="{DynamicResource OgohMatn}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="{Binding ZaxiraOgoh}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding ZaxiraOgohSabab}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" IsVisible="{Binding ZaxiraOgohSababBor}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Classes="tile">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{l:T OxirgiNusxa}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding OxirgiNusxa}" Classes="izoh" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="HozirNusxaTugma" Grid.Column="1" Classes="primary" VerticalAlignment="Center" Content="{l:T HozirNusxa}" Command="{Binding HozirNusxaCommand}" />
+                            </Grid>
+                        </Border>
+                        <WrapPanel ItemSpacing="8" LineSpacing="8">
+                            <Button x:Name="NusxadanTiklashTugma" Classes="ghost" Content="{l:T NusxadanTiklash}" Command="{Binding NusxadanTiklashCommand}" />
+                            <Button x:Name="PapkaniOchTugma" Classes="ghost" Content="{l:T PapkaniOchish}" Command="{Binding PapkaniOchCommand}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{l:T Zaxira_OxirgiNusxalar}" Classes="kichikSarlavha" Margin="0,0,0,8" />
+                        <TextBlock Text="{l:T Zaxira_NusxaYoq}" Classes="izoh" IsVisible="{Binding ZaxiraNusxaYoq}" />
+                        <ItemsControl x:Name="ZaxiraNusxalarRoyxati" ItemsSource="{Binding ZaxiraNusxalari}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ZaxiraQatori">
+                                    <Border BorderBrush="{DynamicResource Chiziq}" BorderThickness="0,0,0,1" Padding="2,9">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="2">
+                                            <TextBlock Text="{Binding Nomi}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Nomi}" />
+                                            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Sabab}" Classes="izoh" VerticalAlignment="Center" />
+                                                <Border Classes="badge kulrang" IsVisible="{Binding StandartPapkada}" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding StandartPapkadaMatn}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Grid.RowSpan="2" Text="{Binding Vaqt}" Classes="izoh" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Grid.RowSpan="2" Text="{Binding Hajm}" FontWeight="SemiBold" FontSize="13" MinWidth="64" TextAlignment="Right" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{l:T Zaxira_Telegram}" Classes="kichikSarlavha" />
+                        <TextBlock Text="{l:T Zaxira_TelegramIzoh}" Classes="izoh" TextWrapping="Wrap" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{l:T Zaxira_Token, Katta=True}" Classes="yorliq" Margin="0" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <TextBox x:Name="TgTokenMaydon" MinHeight="46" CornerRadius="23" Text="{Binding TgToken}" PlaceholderText="{Binding TgTokenMaska}" PasswordChar="•" />
+                                <Button x:Name="TokenOchirTugma" Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="{l:T Zaxira_TokenOchir}"
+                                        Command="{Binding TokenniOchirCommand}" IsVisible="{Binding TokenBor}" />
+                            </Grid>
+                            <TextBlock Text="{l:T Zaxira_TokenYangi}" Classes="izoh" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{l:T Zaxira_ChatId, Katta=True}" Classes="yorliq" Margin="0" />
+                            <TextBox x:Name="TgChatIdMaydon" MinHeight="46" CornerRadius="23" Text="{Binding TgChatId}" PlaceholderText="-1001234567890" />
+                        </StackPanel>
+                        <CheckBox x:Name="TgYoqilganBelgi" IsChecked="{Binding TgYoqilgan}" Content="{l:T Zaxira_Yoqilgan}" />
+                        <TextBlock Text="{Binding TgXato}" Classes="xatoMatn" IsVisible="{Binding TgXatoBor}" />
+                        <Border Classes="tile">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{l:T Zaxira_OxirgiYuborish}" FontWeight="SemiBold" />
+                                <TextBlock x:Name="TgHolatMatn" Text="{Binding TgHolat}" Classes="izoh" Classes.xatoMatn="{Binding TgHolatXato}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="TgEslatmaMatn" Text="{Binding TgEslatma}" Classes.izoh="{Binding TgEslatmaIzoh}" Classes.xatoMatn="{Binding TgEslatmaXato}"
+                                           Classes.bakOgoh="{Binding TgEslatmaOgoh}" TextWrapping="Wrap" IsVisible="{Binding TgEslatmaBor}" />
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel ItemSpacing="8" LineSpacing="8">
+                            <Button x:Name="TgSaqlaTugma" Classes="primary" Content="{l:T Saqlash}" Command="{Binding TelegramniSaqlaCommand}" />
+                            <Button x:Name="SinovTugma" Classes="ghost" Content="{l:T Zaxira_SinovYuborish}" Command="{Binding SinovYuborCommand}" />
+                            <TextBlock Text="{l:T Zaxira_Saqlanmagan}" Classes="bakOgoh" VerticalAlignment="Center" IsVisible="{Binding TgSaqlanmagan}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
         </Panel>
         </ScrollViewer>
     </Grid>

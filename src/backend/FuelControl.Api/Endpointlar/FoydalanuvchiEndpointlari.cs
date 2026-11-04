@@ -43,6 +43,17 @@ public static class FoydalanuvchiEndpointlari
             return Results.Ok(new LoginJavobiDto(t, muddati, f.Dto()));
         }).AllowAnonymous().Produces<LoginJavobiDto>().ProducesProblem(401).ProducesProblem(429);
 
+        // Faol foydalanuvchi sessiyasini uzaytirish (docs 8.18): amaldagi (hali tugamagan) token bilan yangi token, xuddi login kabi, parolsiz.
+        // Rol va ruxsatlar bazadan olinadi; nofaol yoki bloklangan foydalanuvchi - 401. Muddat 12 soat bo'lib qoladi, audit va hisoblagichlar yozilmaydi.
+        app.MapPost("/auth/yangila", async (HttpContext ctx, FuelControlDbContext db, TokenXizmati token) =>
+        {
+            var f = await db.Foydalanuvchilar.AsNoTracking().FirstOrDefaultAsync(x => x.Id == ctx.User.FoydalanuvchiId());
+            if (f is null || !f.Faol || KirishXizmati.Blokmi(f, DateTime.UtcNow))
+                return Results.Problem(statusCode: 401, title: "Sessiya yangilanmadi", detail: "Foydalanuvchi faol emas yoki bloklangan.");
+            var (t, muddati) = token.Yarat(f);
+            return Results.Ok(new LoginJavobiDto(t, muddati, f.Dto()));
+        }).RequireAuthorization().Produces<LoginJavobiDto>().ProducesProblem(401);
+
         app.MapGet("/me", async (HttpContext ctx, FuelControlDbContext db) =>
         {
             var f = await db.Foydalanuvchilar.FindAsync(ctx.User.FoydalanuvchiId());

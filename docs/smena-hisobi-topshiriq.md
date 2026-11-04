@@ -458,6 +458,24 @@ Olib tashlanadi: barcha `/sotuvlar` yo'llari. `/operatorlar/{id}/hisob` saqlanad
      - ruxsatsiz 403.
    - **Versiya 0.1.5.** Mijozda o'rnatilgach, fc `Zaxira:Papka = E:\baza` qiladi. Bot tokenini foydalanuvchi o'zi Sozlamalarga kiritadi (BotFather'da bot ochib, chat ID ni oladi).
 
+18. **Ishlab turgan foydalanuvchi tizimdan chiqarib yuborilmasin (2026-11-04).**
+   - **Muammo.** Token 12 soat amal qiladi (`Avtorizatsiya.Muddat`), smena esa 24 soat. 12 soatdan keyin birinchi so'rov 401 qaytaradi va klient "Sessiya tugadi" deb kirish oynasiga qaytaradi. Shunda ochiq dialogga yozilgan narsalar yo'qoladi. Mijozda Jabborali "Eski qarz"ni bosganda shunday bo'lgan, foydalanuvchiga bu "dasturdan chiqib ketish" bo'lib ko'rindi. Windows jurnalida qulash yo'q.
+   - **Server.**
+     - `POST /auth/yangila` (token bilan) yangi `LoginJavobiDto` qaytaradi: yangi token va yangi muddat, xuddi login kabi.
+     - Foydalanuvchi nofaol yoki bloklangan bo'lsa 401 qaytadi. Ruxsat va rol bazadan olinadi, xuddi `/me` kabi.
+     - Token muddati 12 soat bo'lib qoladi. Audit yozilmaydi.
+   - **Klientlar (desktop va web bir xil).**
+     - **Uzaytirish.** Token muddatining yarmidan ko'pi o'tgan bo'lsa (6 soatdan kam qolgan) va foydalanuvchi faol bo'lsa (oxirgi 30 daqiqada API so'rovi yoki klaviatura/sichqoncha harakati bo'lgan), fon rejimida `/auth/yangila` chaqiriladi va token almashtiriladi. Bu ko'zga ko'rinmaydi. Bir vaqtda faqat bitta yangilash so'rovi ketadi.
+     - **Tekshiruv.** Taymer har 10 daqiqada tekshiradi. Desktopda DispatcherTimer emas, `Task.Delay` ishlatiladi. Har so'rovdan oldin ham tekshiriladi.
+     - **SignalR.** Token almashganda u yangi tokenni oladi: AccessTokenProvider joriy tokenni qaytaradi.
+     - **Muddat baribir tugasa** (kompyuter uxlagan, 12 soatdan ko'p harakatsiz qolgan): 401 bo'lganda foydalanuvchi kirish oynasiga **otilmaydi**. Joriy ekran va ochiq dialog ustida "Sessiya tugadi — parol/PIN ni qayta kiriting" oynasi chiqadi. Login o'zgartirilmaydi, faqat parol yoki PIN so'raladi. Muvaffaqiyatli kirilgach, rad etilgan so'rov bir marta qayta yuboriladi va dialogdagi ma'lumot saqlanib qoladi.
+     - **Boshqa odam kirmoqchi bo'lsa,** u "Chiqish" ni bosadi va to'liq kirish oynasi ochiladi.
+     - **Nofaol yoki bloklangan foydalanuvchi.** `/auth/yangila` yoki qayta kirish 401/403 bersa, avvalgidek to'liq chiqiladi.
+   - **Testlar.**
+     - Server: yangila — yangi token, nofaol foydalanuvchi uchun 401, eski token muddat tugaguncha ishlaydi.
+     - Klientlar: muddat soxtalashtiriladi (masalan 2 daqiqalik token yoki soat siljitiladi). Faol foydalanuvchi uchun token o'zi yangilanadi. Muddat tugagach "Eski qarz" dialogiga yozilgan ma'lumot qayta kirishdan keyin joyida qoladi va so'rov o'tadi. SignalR yangi token bilan ulanadi.
+   - **Versiya 0.1.6.** Ichida desktopning global xato ushlagichi ham bor (`Services/XatoJurnali.cs`, log `%LOCALAPPDATA%\FuelControl\logs`). Migratsiya yo'q.
+
 ## 9. Ish tartibi
 
 - Faqat o'z papkangizga tegasiz: backend `src/backend` + `tests`, web `src/frontend/web`, desktop `src/frontend/desktop`. `docs/` — faqat fc.

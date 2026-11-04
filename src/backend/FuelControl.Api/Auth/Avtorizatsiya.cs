@@ -58,7 +58,14 @@ public static class RuxsatFilterKengaytmasi
 public sealed class TokenXizmati(IConfiguration konfiguratsiya)
 {
     public const string Emitent = "FuelControl";
-    public static readonly TimeSpan Muddat = TimeSpan.FromHours(12);
+    public static readonly TimeSpan StandartMuddat = TimeSpan.FromHours(12);
+
+    /// <summary>
+    /// Token muddati: "Avtorizatsiya:Muddat" (TimeSpan, masalan "00:03:00" - klientlar qisqa token bilan sinashi uchun); bo'sh, yaroqsiz yoki
+    /// 0 va undan kichik bo'lsa - 12 soat. Login va /auth/yangila bir xil muddat beradi.
+    /// </summary>
+    public TimeSpan Muddat =>
+        TimeSpan.TryParse(konfiguratsiya["Avtorizatsiya:Muddat"], System.Globalization.CultureInfo.InvariantCulture, out var m) && m > TimeSpan.Zero ? m : StandartMuddat;
 
     public static SymmetricSecurityKey Kalit(IConfiguration k) =>
         new(Encoding.UTF8.GetBytes(k["Jwt:Kalit"] ?? throw new InvalidOperationException("Jwt:Kalit sozlanmagan.")));

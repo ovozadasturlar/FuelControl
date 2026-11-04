@@ -5,7 +5,7 @@
     Yangi versiya: faqat <Version> ni o'zgartiring (va web/package.json "version" ni mos qiling).
   -->
   <PropertyGroup>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <!-- .NET SDK InformationalVersion'ga "+commit" qo'shmasin: 0.0.1 bo'lib qolsin. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>

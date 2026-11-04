@@ -24,16 +24,16 @@
 .PARAMETER SkipTunnel
     O'rnatuvchi cloudflared'siz yig'ilgan bo'lsa (build.ps1 -SkipCloudflared), tunnel sinovini o'tkazib yuboradi.
 .PARAMETER OldSetup
-    Avvalgi versiya o'rnatuvchisi (joriy API shaklidagi reliz, >= 0.1.4; masalan, Output\FuelControl-Setup-0.1.4.exe). Berilsa, mijoz
+    Avvalgi versiya o'rnatuvchisi (joriy API shaklidagi reliz, >= 0.1.5; masalan, Output\FuelControl-Setup-0.1.5.exe). Berilsa, mijoz
     qurilmasidagi (jonli bazali) reja sinaladi: eski versiya o'rnatiladi va unda mijozdagidek ma'lumot yaratiladi (3 foydalanuvchi, 2 yoqilg'i
-    va aparat - 5-aparatda krug 10 000; bak tuzatish va kirimi; operator yopgan smena: nasiya, xarajat, kamomat; avans; qo'lda zaxira nusxa; yana
-    bitta OCHIQ smena: unda nasiya, qarz qaytishi va narx o'zgarishi segmenti) -> o'chiriladi (ma'lumot papkasi SAQLANADI; hamma jadvalning
-    barmoq izi va zaxira fayllarining xeshi olinadi) -> yangisi /ADMINPAROL'siz o'rnatiladi (eski parol, foydalanuvchilar va yaratilgan ma'lumot
-    joyida; o'rnatish va API'ning birinchi ishga tushishi eski jadvallarning hech birini o'zgartirmaydi, faqat bo'sh ZaxiraSozlamalari jadvali
-    qo'shiladi, eski zaxira nusxalari bayt-bayt joyida, kunlik avtomatik nusxa olinmaydi) -> Telegram sozlanadi (token maskalanadi, sinov xabari -
-    tashqi xato 200 bilan), smena yopiladi va fonda zaxira nusxa olinadi, appsettings.Local.json orqali papka (E:\baza kabi) va yozib bo'lmaydigan
-    papkada standart papkaga o'tish, yangilashda Local.json va token saqlanadi -> /ADMINPAROL berilsa ham e'tiborga olinmaydi, o'chirib qayta
-    o'rnatganda (JWT kaliti yangilanadi) token baribir saqlanadi -> ma'lumot papkasi o'chirilib toza o'rnatiladi.
+    va aparat - 5-aparatda krug 10 000; bak tuzatish va kirimi; operator yopgan smena: nasiya, xarajat, kamomat; avans; qo'lda zaxira nusxa;
+    Telegram tokeni va chat ID (soxta token) bilan sinov xabari; yana bitta OCHIQ smena: unda nasiya, qarz qaytishi va narx o'zgarishi
+    segmenti) -> o'chiriladi (ma'lumot papkasi SAQLANADI; hamma jadvalning barmoq izi va zaxira faylining xeshi olinadi) -> yangisi
+    /ADMINPAROL'siz o'rnatiladi (eski parol, foydalanuvchilar va yaratilgan ma'lumot joyida; o'rnatish va API'ning birinchi ishga tushishi HECH
+    BIR jadvalni o'zgartirmaydi, migratsiya yo'q; Telegram tokeni va holati, zaxira nusxasi bayt-bayt joyida) -> POST /auth/yangila o'rnatilgan
+    API'da (yangi token, operator, yaroqsiz/tokensiz 401), appsettings.Local.json dagi Avtorizatsiya:Muddat -> eski ochiq smena yopiladi va fonda
+    zaxira nusxa olinadi -> /ADMINPAROL berilsa ham e'tiborga olinmaydi, o'chirib qayta o'rnatganda (JWT kaliti yangilanadi) Telegram tokeni
+    baribir saqlanadi -> ma'lumot papkasi o'chirilib toza o'rnatiladi.
 .PARAMETER KeepFiles
     Muvaffaqiyatli tugaganda ham ish papkasini o'chirmaydi.
 
@@ -460,8 +460,13 @@ try {
             $narx = Put-Json $p4 $r.token "/yoqilgilar/$($yoq.id)" @{ nomi = 'Sinov Dizel ECO'; narx = 16000; rang = '#2563EB'; korsatkichlar = @(@{ aparatId = $apr.id; qiymat = [decimal]109847.58 }) }
             $sg = @((Get-Json $p4 $r.token '/smenalar/joriy').korsatkichlar)
             Check (($narx.narx -eq 16000) -and ($sg.Count -eq 1) -and ($sg[0].aparatRaqam -eq 4) -and ([decimal]$sg[0].boshi -eq [decimal]109797.58) -and ([decimal]$sg[0].oxiri -eq [decimal]109847.58) -and ($sg[0].narx -eq 15500) -and ([decimal]$sg[0].litr -eq [decimal]50) -and ($sg[0].summa -eq 775000) -and ($sg[0].narxOzgarishida -eq $true)) "eski versiyada ochiq smenada narx o'zgarishi segmenti yozildi: 109 797.58 -> 109 847.58 (50 L x 15 500)"
+            Start-Sleep -Seconds 2     # qo'lda nusxa birinchi smena nusxasidan KEYINGI soniyada olinsin (nom soniyagacha aniq: tartib va 'oxirgi nusxa' belgisi aniq bo'ladi)
             $zaxOld = Post-Json $p4 $r.token '/zaxira' @{}
-            Check (($zaxOld.hajmBayt -gt 0) -and (Test-Path -LiteralPath (Join-Path "$data6\zaxira" $zaxOld.faylNomi))) "eski versiyada qo'lda zaxira nusxa olindi: $($zaxOld.faylNomi)"
+            Check (($zaxOld.hajmBayt -gt 0) -and ($zaxOld.sabab -eq 'qolda') -and (Test-Path -LiteralPath (Join-Path "$data6\zaxira" $zaxOld.faylNomi))) "eski versiyada qo'lda zaxira nusxa olindi: $($zaxOld.faylNomi)"
+            $tgTok = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'; $tgChat = '-1001234567890'; $uch = [string][char] 0x2026
+            $tgPut = Put-Json $p4 $r.token '/zaxira/telegram' @{ token = $tgTok; chatId = $tgChat }
+            $tgSn = Post-Json $p4 $r.token '/zaxira/telegram/sinov' @{}
+            Check (($tgPut.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($tgPut.telegram.faol -eq $true) -and ($tgSn.telegram.oxirgiTuri -eq 'sinov') -and ($tgSn.telegram.oxirgiMuvaffaqiyat -eq $false)) "eski versiyada Telegram sozlandi (token faqat maska) va sinov xabari yuborildi, holat yozildi: [$($tgSn.telegram.oxirgiXabar)]"
         }
         Stop-Api
         Uninstall-One $app6
@@ -474,15 +479,15 @@ try {
             ForEach-Object { [regex]::Match($_.Name, '^(\d{14}_\w+)\.cs$') } | Where-Object { $_.Success } | ForEach-Object { $_.Groups[1].Value })
         $eskiMig = Sql-Qatorlar $dbFayl 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
         $yangiMigId = @($repoMig | Where-Object { $eskiMig -notcontains $_ })
-        Check (($eskiMig.Count -eq $repoMig.Count - 1) -and (@($eskiMig | Where-Object { $repoMig -notcontains $_ }).Count -eq 0) -and ($yangiMigId.Count -eq 1) -and ($yangiMigId[0] -match '_ZaxiraSozlamalari$')) "eski baza: $($eskiMig.Count) ta migratsiya (oxirgisi $($eskiMig[-1])); bu reliz bitta yangi migratsiya qo'shadi: $($yangiMigId -join ', ')"
+        Check (($eskiMig -join ';') -eq ($repoMig -join ';')) "eski baza: $($eskiMig.Count) ta migratsiya, repodagi bilan bir xil (oxirgisi $($eskiMig[-1])); bu reliz migratsiya qo'shmaydi"
         $ustunEski = Baza-Ustunlari $dbFayl
         $izEski = Baza-Izi $dbFayl
-        Check (-not $ustunEski.ContainsKey('ZaxiraSozlamalari')) "eski baza: ZaxiraSozlamalari jadvali yo'q (eski sxema)"
+        Check ($ustunEski.ContainsKey('ZaxiraSozlamalari')) "eski baza: ZaxiraSozlamalari jadvali bor (0.1.5 sxemasi)"
         $krugEski = Sql-Qatorlar $dbFayl 'SELECT Raqam, KrugHajmi FROM Aparatlar ORDER BY Raqam'
         Check (($krugEski[0] -eq '4|') -and ($krugEski[1] -match '^5\|10000')) "eski baza: 5-aparatda krug 10 000, 4-aparatda yo'q ($($krugEski -join '; '))"
         $zaxEski = @{}; foreach ($zf in Get-ChildItem "$data6\zaxira" -Filter 'fuelcontrol-*.db') { $zaxEski[$zf.Name] = (Get-FileHash $zf.FullName -Algorithm SHA256).Hash }
-        Check (($zaxEski.Count -ge 2) -and (@($zaxEski.Keys | Where-Object { $_ -notmatch '^fuelcontrol-\d{8}-\d{6}\.db$' }).Count -eq 0)) "eski versiya zaxira nusxalari: $($zaxEski.Count) ta (kunlik va qo'lda), hammasi eski nomda (sababsiz)"
-        $kutilgan = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 3; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3 }
+        Check (($zaxEski.Count -eq 2) -and (@($zaxEski.Keys | Where-Object { $_ -match '^fuelcontrol-\d{8}-\d{6}-smena\d+\.db$' }).Count -eq 1) -and (@($zaxEski.Keys | Where-Object { $_ -match '^fuelcontrol-\d{8}-\d{6}-qolda\.db$' }).Count -eq 1)) "eski versiya (0.1.5) zaxira nusxalari: 2 ta - birinchi smena yopilganda olingan (-smena) va qo'lda olingan (-qolda); kunlik avtomatik nusxa yo'q"
+        $kutilgan = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 3; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3; ZaxiraSozlamalari = 1 }
         $tavsif = ($kutilgan.Keys | ForEach-Object { '{0} {1}' -f $_, $kutilgan[$_] }) -join ', '
         $nomos = @($kutilgan.Keys | Where-Object { (Iz-Soni $izEski $_) -ne $kutilgan[$_] })
         Check ($nomos.Count -eq 0) "eski baza (jonli ma'lumot namunasi), qatorlar: $tavsif$(if ($nomos.Count) { ' - mos kelmadi: ' + ($nomos -join ', ') })"
@@ -518,15 +523,13 @@ try {
         Check $up "yangi API eski bazada ishga tushdi (migratsiya qo'llandi)"
         Stop-Api
         $izYangi1 = Baza-Izi $dbFayl $ustunEski
-        $farq1 = Iz-Farqi $izEski $izYangi1 @('__EFMigrationsHistory', 'ZaxiraSozlamalari')
-        Check ($farq1.Count -eq 0) "yangi API birinchi marta ishga tushgach hech bir jadvalning eski ustunlari o'zgarmadi (foydalanuvchilar, aparatlar, bak, segmentlar, nasiya, harakat, audit)$(if ($farq1.Count) { ' - farq: ' + ($farq1 -join ', ') })"
+        $farq1 = Iz-Farqi $izEski $izYangi1
+        Check ($farq1.Count -eq 0) "yangi API birinchi marta ishga tushgach HECH BIR jadval o'zgarmadi (migratsiya yo'q; foydalanuvchilar, aparatlar, bak, segmentlar, nasiya, harakat, audit, Telegram sozlamasi va migratsiyalar tarixi)$(if ($farq1.Count) { ' - farq: ' + ($farq1 -join ', ') })"
         $nomos = @($kutilgan.Keys | Where-Object { (Iz-Soni $izYangi1 $_) -ne $kutilgan[$_] })
         Check (($nomos.Count -eq 0) -and ((Iz-Soni $izYangi1 'Audit') -eq $auditEski)) "yangilashdan keyin qatorlar soni joyida: $tavsif, audit $auditEski"
         $mig1 = Sql-Qatorlar $dbFayl 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
-        Check (($mig1.Count -eq $eskiMig.Count + 1) -and ((@($mig1 | Select-Object -First $eskiMig.Count) -join ';') -eq ($eskiMig -join ';')) -and ($mig1[-1] -eq $yangiMigId[0])) "migratsiyalar tarixi: eski $($eskiMig.Count) ta yozuv joyida, bittasi qo'shildi - $($mig1[-1])"
-        $zUst = Sql-Qatorlar $dbFayl 'PRAGMA table_info(ZaxiraSozlamalari)'
-        Check ((($zUst | ForEach-Object { $_.Split('|')[1] }) -join ',') -eq 'Id,TelegramTokenShifr,TelegramChatId,TelegramYoqilgan,YuborishVaqti,YuborishMuvaffaqiyat,YuborishXabari,YuborishTuri,OxirgiYuborilganFayl') "yangi ZaxiraSozlamalari jadvali yaratildi (token shifri, chat ID, yuborish holati)"
-        Check ((Sql-Qatorlar $dbFayl 'SELECT COUNT(*) FROM ZaxiraSozlamalari')[0] -eq '0') "ZaxiraSozlamalari jadvali bo'sh (token va sozlama hali kiritilmagan)"
+        Check (($mig1 -join ';') -eq ($eskiMig -join ';')) "migratsiyalar tarixi o'zgarmadi: $($mig1.Count) ta yozuv (bu reliz migratsiya qo'shmaydi)"
+        Check ((Sql-Qatorlar $dbFayl 'SELECT COUNT(*) FROM ZaxiraSozlamalari')[0] -eq '1') "ZaxiraSozlamalari: eski qator (Telegram sozlamasi) joyida"
         $krugYangi = Sql-Qatorlar $dbFayl 'SELECT Raqam, KrugHajmi FROM Aparatlar ORDER BY Raqam'
         Check (($krugYangi[0] -eq '4|') -and ($krugYangi[1] -match '^5\|10000')) "aparatlar krug hajmi o'zgarmadi: 4-aparatda yo'q, 5-aparatda 10 000"
         $zaxYangi = @{}; foreach ($zf in Get-ChildItem "$data6\zaxira" -Filter 'fuelcontrol-*.db') { $zaxYangi[$zf.Name] = (Get-FileHash $zf.FullName -Algorithm SHA256).Hash }
@@ -579,25 +582,48 @@ try {
                     Check ($kod -eq 200) "GET $yol -> $kod"
                 }
 
-                # --- Spec 8.17: zaxira nusxa (smena yopilganda, soni bo'yicha saqlash, E:\baza kabi papka va zaxira papka, Telegram) ---
-                $zaxPapka = "$data6\zaxira"
+                # --- Yangilashdan keyin zaxira va Telegram sozlamasi joyida (0.1.5 da kiritilgan token DPAPI bilan shifrlangan holda bazada o'zgarmagan) ---
                 $uch = [string][char] 0x2026
-                $tgToken = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'; $tgChat = '-1001234567890'
+                $zaxPapka = "$data6\zaxira"
                 $hz = Get-Json $p4 $tk '/zaxira/holat'
-                Check (($hz.papka -eq $zaxPapka) -and ($hz.sozlanganPapka -eq $zaxPapka) -and ($hz.standartPapkaga -eq $false) -and ($null -eq $hz.standartPapkaSababi) -and ($hz.saqlash -eq 30)) "zaxira holati: papka $zaxPapka (standart), ogohlantirish yo'q, 30 ta saqlanadi"
-                $royxat0 = (@($hz.nusxalar | ForEach-Object { $_.nomi }) | Sort-Object) -join ';'
-                Check (($royxat0 -eq (($zaxEski.Keys | Sort-Object) -join ';')) -and (@($hz.nusxalar | Where-Object { $_.sabab -ne '' -or $null -ne $_.smenaId }).Count -eq 0)) "eski versiya nusxalari ($($zaxEski.Count) ta, sababsiz nomli) ro'yxatda ko'rinadi"
-                Check (($hz.telegram.yoqilgan -eq $true) -and ($hz.telegram.faol -eq $false) -and ($null -eq $hz.telegram.tokenMaska)) "Telegram sozlanmagan: faol emas, token yo'q"
-                $xt = Put-Xato $p4 $tk '/zaxira/telegram' @{ token = 'yomon-token-qiymati-123' }
-                Check (($xt.Kod -eq 400) -and ($xt.Matn -notmatch 'yomon-token')) "noto'g'ri token formati -> 400 (kod $($xt.Kod)), xato matnida kiritilgan qiymat yo'q"
-                $put = Put-Json $p4 $tk '/zaxira/telegram' @{ token = $tgToken; chatId = $tgChat }
-                Check (($put.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($put.telegram.chatId -eq $tgChat) -and ($put.telegram.faol -eq $true) -and ($put.telegram.yoqilgan -eq $true)) "Telegram sozlandi: token faqat maska (...Dsaw), chat ID, faol"
+                Check (($hz.papka -eq $zaxPapka) -and ($hz.standartPapkaga -eq $false) -and ($hz.saqlash -eq 30) -and ((@($hz.nusxalar | ForEach-Object { $_.sabab }) -join ',') -eq 'qolda,smena') -and ($hz.nusxalar[0].nomi -eq $zaxOld.faylNomi) -and ($hz.nusxalar[1].smenaId -eq $sm.id)) "zaxira holati: eski (0.1.5) ikki nusxa ro'yxatda (qo'lda va 1-smena yopilgandagi), papka standart, 30 ta saqlanadi"
+                Check (($hz.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($hz.telegram.chatId -eq $tgChat) -and ($hz.telegram.yoqilgan -eq $true) -and ($hz.telegram.faol -eq $true) -and ($hz.telegram.oxirgiTuri -eq 'sinov') -and ($hz.telegram.oxirgiMuvaffaqiyat -eq $false) -and ($hz.telegram.oxirgiXabar -eq $tgSn.telegram.oxirgiXabar)) "Telegram sozlamasi yangilashdan keyin joyida: token (...Dsaw), chat ID, faol, oxirgi holat o'zgarmagan"
                 $xom = (Invoke-WebRequest "$api6/zaxira/holat" -Headers @{ Authorization = "Bearer $tk" } -UseBasicParsing).Content
                 Check (($xom -notmatch 'AAHdq') -and ($xom -notmatch '123456789:')) "GET /zaxira/holat javobida token yo'q (faqat maska)"
-                $sn = Post-Json $p4 $tk '/zaxira/telegram/sinov' @{}
-                Check (($sn.telegram.oxirgiTuri -eq 'sinov') -and ($sn.telegram.oxirgiMuvaffaqiyat -eq $false) -and ($sn.telegram.oxirgiXabar -notmatch 'AAHdq')) "Sinov yuborish: haqiqiy tarmoq, soxta token -> 200 va holatda xato (tashqi xato 4xx/5xx emas): [$($sn.telegram.oxirgiXabar)]"
-
-                # Smena yopiladi: yopish javobidan keyin fonda nusxa olinadi va (Telegram yoqilgani uchun) yuborishga urinadi.
+                
+                # --- Spec 8.18: POST /auth/yangila o'rnatilgan API'da (faol foydalanuvchi sessiyasini uzaytirish) ---
+                Start-Sleep -Seconds 1
+                $yn = Post-Json $p4 $tk '/auth/yangila' @{}
+                $qolgan = ([datetime]$yn.tokenMuddati).ToUniversalTime().Subtract([datetime]::UtcNow).TotalMinutes
+                Check (($yn.token -ne $tk) -and ($yn.foydalanuvchi.login -eq 'admin') -and ($qolgan -gt 11.9 * 60) -and ($qolgan -lt 12.1 * 60)) "yangila: yangi token, foydalanuvchi admin, muddat 12 soat (qolgan $([math]::Round($qolgan / 60, 2)) soat)"
+                Check (((Get-Json $p4 $yn.token '/me').login -eq 'admin') -and ((Get-Json $p4 $tk '/me').login -eq 'admin')) "yangi token ishlaydi va eski token ham muddati tugaguncha ishlaydi"
+                $opY = Post-Json $p4 $op.token '/auth/yangila' @{}
+                Check (($opY.foydalanuvchi.login -eq $opLogin) -and ($opY.foydalanuvchi.rol -eq 'Operator') -and ((@($opY.foydalanuvchi.ruxsatlar) | Sort-Object) -join ',') -eq ((@($op.foydalanuvchi.ruxsatlar) | Sort-Object) -join ',')) "yangila: operator ($opLogin) o'z roli va ruxsatlari bilan"
+                $yX = Post-Xato $p4 'bu.token.emas' '/auth/yangila' @{}
+                $yBos = try { (Invoke-WebRequest "$api6/auth/yangila" -Method Post -UseBasicParsing).StatusCode } catch { [int] $_.Exception.Response.StatusCode }
+                Check (($yX.Kod -eq 401) -and ($yBos -eq 401)) "yangila: yaroqsiz token ($($yX.Kod)) va tokensiz ($yBos) -> 401"
+                
+                # Avtorizatsiya:Muddat (appsettings.Local.json): klientlar qisqa token bilan sinashi uchun; login va yangila bir xil muddat beradi.
+                Stop-Api
+                $localJson = "$app6\Server\appsettings.Local.json"
+                $localAsl = if (Test-Path -LiteralPath $localJson) { Get-Content -LiteralPath $localJson -Raw } else { $null }
+                @{ Avtorizatsiya = @{ Muddat = '00:03:00' } } | ConvertTo-Json | Set-Content -LiteralPath $localJson -Encoding utf8NoBOM
+                $upM = Start-Api $app6 $p4
+                Check $upM "API appsettings.Local.json (Avtorizatsiya:Muddat = 00:03:00) bilan ishga tushdi"
+                if ($upM) {
+                    $lq = Login $p4 $eskiParol
+                    $yq = Post-Json $p4 $lq.token '/auth/yangila' @{}
+                    $m1 = ([datetime]$lq.tokenMuddati).ToUniversalTime().Subtract([datetime]::UtcNow).TotalSeconds
+                    $m2 = ([datetime]$yq.tokenMuddati).ToUniversalTime().Subtract([datetime]::UtcNow).TotalSeconds
+                    Check (($m1 -gt 150) -and ($m1 -lt 185) -and ($m2 -gt 150) -and ($m2 -lt 185)) "sozlangan muddat: login va yangila ikkalasi ~3 daqiqa (login $([math]::Round($m1)) s, yangila $([math]::Round($m2)) s)"
+                }
+                Stop-Api
+                if ($null -ne $localAsl) { Set-Content -LiteralPath $localJson -Value $localAsl -NoNewline -Encoding utf8NoBOM } else { Remove-Item -LiteralPath $localJson -Force }
+                Check (Start-Api $app6 $p4) "API standart muddat bilan qayta ishga tushdi"
+                $tk = (Login $p4 $eskiParol).token
+                $op = Login $p4 $opParol $opLogin
+                
+                # Ochiq smena (eski versiyada ochilgan) yangilashdan keyin yopiladi: yopish javobidan keyin fonda zaxira nusxa olinadi va Telegram'ga yuborishga urinadi.
                 $fayllar0 = @(Get-ChildItem $zaxPapka -Filter 'fuelcontrol-*.db').Count
                 $a1 = @(Get-Json $p4 $tk '/aparatlar')
                 $kors2 = @(@{ aparatId = $a1[0].id; qiymat = [decimal]109897.58 }, @{ aparatId = $a1[1].id; qiymat = [decimal]20030.52 })
@@ -616,55 +642,6 @@ try {
                     $tgH = $null
                     for ($i = 0; $i -lt 40; $i++) { $tgH = (Get-Json $p4 $tk '/zaxira/holat').telegram; if ($tgH.oxirgiTuri -eq 'nusxa') { break }; Start-Sleep -Milliseconds 500 }
                     Check (($tgH.oxirgiTuri -eq 'nusxa') -and ($tgH.oxirgiMuvaffaqiyat -eq $false) -and ($tgH.oxirgiXabar -match [regex]::Escape($smenaNusxa.Name)) -and ($tgH.oxirgiXabar -notmatch 'AAHdq')) "nusxa Telegram'ga yuborishga urindi (soxta token): holatda xato, fayl nomi bor, token yo'q: [$($tgH.oxirgiXabar)]"
-                }
-
-                # appsettings.Local.json orqali papka (mijozda E:\baza): yaratiladi va nusxa shu yerga tushadi; yozib bo'lmasa standart papkaga.
-                $localJson = "$app6\Server\appsettings.Local.json"
-                $kopPapka = "$T\baza\ichki"
-                $mahalliy = { param($papka) @{ Zaxira = @{ Papka = $papka; Shoxobcha = 'E2E shoxobcha' } } | ConvertTo-Json | Set-Content -LiteralPath $localJson -Encoding utf8NoBOM }
-                Stop-Api
-                & $mahalliy $kopPapka
-                $up2 = Start-Api $app6 $p4
-                Check $up2 "API appsettings.Local.json (Zaxira:Papka = $kopPapka) bilan qayta ishga tushdi"
-                if ($up2) {
-                    $tk2 = (Login $p4 $eskiParol).token
-                    $z1 = Post-Json $p4 $tk2 '/zaxira' @{}
-                    Check (($z1.papka -eq $kopPapka) -and ($z1.standartPapkaga -eq $false) -and ($z1.sabab -eq 'qolda') -and (Test-Path -LiteralPath (Join-Path $kopPapka $z1.faylNomi))) "Local.json papkasi (E:\baza kabi) yaratildi va qo'lda nusxa shu yerga tushdi: $($z1.faylNomi)"
-                    $h2 = Get-Json $p4 $tk2 '/zaxira/holat'
-                    Check (($h2.papka -eq $kopPapka) -and ($h2.standartPapkaga -eq $false) -and (@($h2.nusxalar | Where-Object { $_.standartPapkada }).Count -eq $zaxEski.Count + 1) -and (@($h2.nusxalar | Where-Object { -not $_.standartPapkada }).Count -eq 1)) "holat: nusxalar ro'yxati ikkala papkadan ($($zaxEski.Count) eski + 1 smena nusxasi standart papkada, 1 yangi sozlangan papkada)"
-                    Check (($h2.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($h2.telegram.faol -eq $true)) "API qayta ishga tushgach Telegram tokeni joyida (...Dsaw), faol"
-
-                    Stop-Api
-                    $fayl = "$T\fayl.txt"; Set-Content -LiteralPath $fayl -Value 'x'
-                    $buzuk = "$fayl\baza"
-                    & $mahalliy $buzuk
-                    $up3 = Start-Api $app6 $p4
-                    Check $up3 "API yozib bo'lmaydigan Zaxira:Papka bilan ishga tushdi (disk ulanmagan holat)"
-                    if ($up3) {
-                        $tk3 = (Login $p4 $eskiParol).token
-                        $z2 = Post-Json $p4 $tk3 '/zaxira' @{}
-                        Check (($z2.standartPapkaga -eq $true) -and ($z2.papka -eq $zaxPapka) -and (Test-Path -LiteralPath (Join-Path $zaxPapka $z2.faylNomi))) "papka yozilmaganda nusxa standart papkaga tushdi: $($z2.faylNomi)"
-                        $h3 = Get-Json $p4 $tk3 '/zaxira/holat'
-                        Check (($h3.standartPapkaga -eq $true) -and ($h3.papka -eq $zaxPapka) -and ($h3.sozlanganPapka -eq $buzuk) -and ($h3.standartPapkaSababi -match 'fayl\.txt')) "holatda ogohlantirish: sozlangan papka ishlamayapti ($($h3.standartPapkaSababi))"
-                        $logMatn = Log-Matni "$data6\logs"
-                        Check (($logMatn -match 'Zaxira papkasi ishlamayapti') -and ($logMatn -notmatch 'AAHdq')) "logda papka ogohlantirishi bor, token yo'q"
-                    }
-
-                    # Yangilash (qayta o'rnatish) paytida appsettings.Local.json va Telegram tokeni saqlanadi.
-                    Stop-Api
-                    & $mahalliy $kopPapka
-                    $jwt0 = (Json "$app6\Server\appsettings.Production.json").Jwt.Kalit
-                    $code = Run-Setup ($baza + $tasks8) 'new-reinstall'
-                    Check ($code -eq 0) "yangilash (qayta o'rnatish) tugadi (kod $code)"
-                    Check ((Test-Path -LiteralPath $localJson) -and ((Json $localJson).Zaxira.Papka -eq $kopPapka)) "yangilashdan keyin appsettings.Local.json joyida"
-                    $up4 = Start-Api $app6 $p4
-                    Check $up4 "yangilashdan keyin API ishga tushdi"
-                    if ($up4) {
-                        $tk = (Login $p4 $eskiParol).token
-                        $op = Login $p4 $opParol $opLogin
-                        $h4 = Get-Json $p4 $tk '/zaxira/holat'
-                        Check (($h4.papka -eq $kopPapka) -and ($h4.telegram.tokenMaska -eq ($uch + 'Dsaw')) -and ($h4.telegram.chatId -eq $tgChat) -and ($h4.telegram.faol -eq $true)) "yangilashdan keyin: Local.json papkasi va Telegram tokeni joyida (...Dsaw)"
-                    }
                 }
                 $a3 = @(Get-Json $p4 $tk '/aparatlar')
                 Check (($a3.Count -eq 2) -and ([decimal]$a3[0].totalLitr -eq [decimal]109897.58) -and ([decimal]$a3[0].bakQoldiq -eq [decimal]4917.83) -and ($null -eq $a3[0].krugHajmi) -and ([decimal]$a3[1].totalLitr -eq [decimal]20030.52) -and ([decimal]$a3[1].bakQoldiq -eq [decimal]10050) -and ([decimal]$a3[1].krugHajmi -eq 10000)) "aparatlar smena yopilgach: 4 - total 109897.58 / bak 4917.83; 5 - total 20030.52 / bak 10050.00, krug 10 000 joyida"
@@ -685,15 +662,15 @@ try {
         Check (($yangiMig -join ';') -eq ($repoMig -join ';')) "baza tarixi repodagi $($repoMig.Count) ta migratsiya bilan bir xil: kutilayotgan ham, begona ham yo'q (oxirgisi $($yangiMig[-1]))"
         # Tuzatish, krug va yopish faqat Aparatlar, Smenalar, SmenaKorsatkichlari va Audit'ga tegadi; qolgan hamma jadval (eski ustunlari) qiymatigacha bir xil.
         $ozgargan = (@($izEski.Keys | Where-Object { $_ -ne '__EFMigrationsHistory' -and $izEski[$_] -ne $izOxiri[$_] }) | Sort-Object) -join ', '
-        Check ($ozgargan -eq 'Aparatlar, Audit, SmenaKorsatkichlari, Smenalar') "faqat kutilgan jadvallar o'zgardi (aparatlar, audit, smena segmentlari, smenalar): $ozgargan"
-        $yakuniy = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 5; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3 }
+        Check ($ozgargan -eq 'Aparatlar, Audit, SmenaKorsatkichlari, Smenalar, ZaxiraSozlamalari') "faqat kutilgan jadvallar o'zgardi (aparatlar, audit, smena segmentlari, smenalar, zaxira sozlamasining yuborish holati): $ozgargan"
+        $yakuniy = [ordered] @{ Foydalanuvchilar = 3; Yoqilgilar = 2; NarxTarixlari = 1; Aparatlar = 2; BakKirimlari = 1; BakTuzatishlari = 1; Smenalar = 2; SmenaKorsatkichlari = 5; Nasiyalar = 2; NasiyaQaytishlari = 1; Xarajatlar = 1; Harakatlar = 3; ZaxiraSozlamalari = 1 }
         $nomos = @($yakuniy.Keys | Where-Object { (Iz-Soni $izOxiri $_) -ne $yakuniy[$_] })
         Check ($nomos.Count -eq 0) "yakuniy qatorlar soni: foydalanuvchilar 3, aparatlar 2, bak kirimi 1, smena segmentlari 5 (birinchi smenada 2, ikkinchisida 3), nasiyalar 2, harakatlar 3$(if ($nomos.Count) { ' - mos kelmadi: ' + ($nomos -join ', ') })"
         $audTurOxiri = Sql-Qatorlar $dbFayl 'SELECT Tur, COUNT(*) FROM Audit GROUP BY Tur ORDER BY Tur'
         $tEski = @{}; foreach ($qt in $audTurEski) { $tEski[$qt.Split('|')[0]] = [int] $qt.Split('|')[1] }
         $tYangi = @{}; foreach ($qt in $audTurOxiri) { $tYangi[$qt.Split('|')[0]] = [int] $qt.Split('|')[1] }
         $tFarq = (@(@($tEski.Keys) + @($tYangi.Keys) | Select-Object -Unique | Sort-Object | Where-Object { [int]$tYangi[$_] -ne [int]$tEski[$_] } | ForEach-Object { '{0} {1:+#;-#}' -f $_, ([int]$tYangi[$_] - [int]$tEski[$_]) })) -join ', '
-        Check (((Iz-Soni $izOxiri 'Audit') -eq ($auditEski + 4)) -and ($tFarq -eq 'smena +1, sozlama +3')) "audit yozuvlari $auditEski -> $($auditEski + 4): 'Smena yopildi' 1 ta, 'Telegram sozlandi' 1 ta va 'Zaxira nusxa olindi' 2 ta qo'shildi (smena +1, sozlama +3)"
+        Check (((Iz-Soni $izOxiri 'Audit') -eq ($auditEski + 1)) -and ($tFarq -eq 'smena +1')) "audit yozuvlari $auditEski -> $($auditEski + 1): faqat 'Smena yopildi' qo'shildi (/auth/yangila va nusxa yuborish auditga yozmaydi)"
         $smQ = Sql-Qatorlar $dbFayl "SELECT NasiyaJami, QaytganNasiya, XarajatJami, Savdo, Plastik, DepozitFarqi, Kutilgan, Farq, PlastikSummalari FROM Smenalar WHERE Id = $($sm2.id)"
         Check (($smQ.Count -eq 1) -and ($smQ[0] -eq '40000|30000|0|2995000|55000|20000|2990000|0|60000,65000')) "yopilgan smena yig'indilari bazada: nasiya 40 000, qaytgan 30 000, savdo 2 995 000, plastik 55 000, depozit farqi 20 000, kutilgan 2 990 000, farq 0, plastik qismlari 60000,65000"
         $sq = "SELECT COUNT(*) FROM SmenaKorsatkichlari WHERE SmenaId = $($sm2.id)"
@@ -708,7 +685,7 @@ try {
         $zAud = @(Sql-Qatorlar $dbFayl "SELECT Tafsilot FROM Audit WHERE Amal = 'Telegram sozlandi'")
         Check (($zAud.Count -eq 1) -and ($zAud[0] -eq "token yangilandi $nuqtaB chat ID -1001234567890") -and ($zAud[0] -notmatch 'Dsaw|AAHdq')) "auditda Telegram sozlamasi: '$($zAud[0])' (tokenning belgisi yo'q)"
         $zArx = @(Sql-Qatorlar $dbFayl "SELECT COUNT(*) FROM Audit WHERE Amal = 'Zaxira nusxa olindi'")
-        Check ($zArx[0] -eq '3') "auditda 'Zaxira nusxa olindi' 3 ta: eski versiyadagi 1 + yangi versiyadagi 2 (papka va standart papka)"
+        Check ($zArx[0] -eq '1') "auditda 'Zaxira nusxa olindi' 1 ta: eski versiyadagi qo'lda nusxa (smena yopilganda avtomatik nusxa auditga yozilmaydi)"
         $ap = Sql-Qatorlar $dbFayl "SELECT COUNT(*) FROM Aparatlar WHERE (Raqam = 4 AND CAST(TotalLitr AS REAL) = 109897.58 AND CAST(BakQoldiq AS REAL) = 4917.83 AND KrugHajmi IS NULL) OR (Raqam = 5 AND CAST(TotalLitr AS REAL) = 20030.52 AND CAST(BakQoldiq AS REAL) = 10050 AND CAST(KrugHajmi AS REAL) = 10000)"
         Check ($ap[0] -eq '2') "aparatlar bazada: 4 - total 109897.58, bak 4917.83, krug yo'q; 5 - total 20030.52, bak 10050.00, krug 10 000"
         $smena1Oxiri = Sql-Qatorlar $dbFayl "SELECT * FROM Smenalar WHERE Id = $($sm.id)"
@@ -719,6 +696,7 @@ try {
         Check ($fk.Count -eq 0) "begona kalit buzilishi yo'q (PRAGMA foreign_key_check bo'sh)"
         $idx = Sql-Qatorlar $dbFayl "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'IX_Smenalar_BittaOchiq'"
         Check ($idx.Count -eq 1) "'bitta ochiq smena' indeksi (IX_Smenalar_BittaOchiq) yangilashdan keyin ham bor"
+        $jwt0 = (Json "$app6\Server\appsettings.Production.json").Jwt.Kalit
         Uninstall-One $app6
 
         '-- 8b. Baza bor bo''lsa /ADMINPAROL berilsa ham e''tiborga olinmaydi --'

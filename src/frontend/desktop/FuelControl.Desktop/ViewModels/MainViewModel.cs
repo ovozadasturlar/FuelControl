@@ -120,6 +120,7 @@ public partial class MainViewModel : ObservableObject
         Malumot.Ozgardi += RuxsatlarniYangila;
         Malumot.AloqaOzgardi += () => { OnPropertyChanged(nameof(AloqaBor)); OnPropertyChanged(nameof(AloqaUlanmoqda)); OnPropertyChanged(nameof(AloqaYoq)); };
         Malumot.MajburiyChiqish += sabab => _ = ChiqishAsync(sabab);
+        Malumot.QaytaKirishSorovi = SessiyaniSora;
         Bildirish.Korsatildi += (sarlavha, matn, xato) =>
         {
             BildirishSarlavha = sarlavha; BildirishMatni = matn; BildirishXato = xato;
@@ -141,6 +142,7 @@ public partial class MainViewModel : ObservableObject
     private async System.Threading.Tasks.Task ChiqishAsync(string? sabab)
     {
         if (!Kirilgan) return;
+        if (SessiyaOchiq) SessiyaniYop(false);
         Kirilgan = false;
         foreach (var d in new DialogVM[] { Dialoglar.Nasiya, Dialoglar.Qaytish, Dialoglar.Xarajat, Dialoglar.Bak, Dialoglar.Narx, Dialoglar.NarxTuzatish }) d.Ochiq = false;
         if (TasdiqOchiq) TasdiqJavob("0");
@@ -201,4 +203,62 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private System.Threading.Tasks.Task Chiqish() => ChiqishAsync(null);
+
+    // ================= §8.18 "Sessiya tugadi" — joriy ekran va ochiq dialog ustida =================
+    [ObservableProperty] private bool _sessiyaOchiq;
+    [ObservableProperty] private string _sessiyaParol = "";
+    [ObservableProperty] private string _sessiyaXato = "";
+    [ObservableProperty] private bool _sessiyaBand;
+    private System.Threading.Tasks.TaskCompletionSource<bool>? _sessiya;
+    public bool SessiyaPin => Joriy.Rol == FuelControl.Contracts.Rol.Operator;
+    public string SessiyaIzoh => Til.F(SessiyaPin ? "Sessiya_IzohPin" : "Sessiya_IzohParol", Joriy.ToliqIsm, Joriy.Login);
+    public string SessiyaYorliq => Til.T(SessiyaPin ? "PinKod" : "Parol").ToUpperInvariant();
+    public string SessiyaSarlavha => Til.T("Sessiya_Sarlavha");
+
+    private System.Threading.Tasks.Task<bool> SessiyaniSora()
+    {
+        if (!Kirilgan) return System.Threading.Tasks.Task.FromResult(false);
+        if (_sessiya is { } bor) return bor.Task;
+        _sessiya = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        SessiyaParol = ""; SessiyaXato = ""; SessiyaBand = false;
+        OnPropertyChanged(nameof(SessiyaPin)); OnPropertyChanged(nameof(SessiyaIzoh)); OnPropertyChanged(nameof(SessiyaYorliq));
+        SessiyaOchiq = true;
+        return _sessiya.Task;
+    }
+
+    private void SessiyaniYop(bool natija)
+    {
+        SessiyaOchiq = false;
+        SessiyaParol = "";
+        var t = _sessiya;
+        _sessiya = null;
+        t?.TrySetResult(natija);
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task SessiyaKir()
+    {
+        if (SessiyaBand) return;
+        if (SessiyaPin ? SessiyaParol.Length < 4 : SessiyaParol.Length == 0) { SessiyaXato = Til.T(SessiyaPin ? "Xato_Pin" : "ParolniKiriting"); return; }
+        SessiyaBand = true;
+        try
+        {
+            await Malumot.QaytaKir(SessiyaParol);
+            SessiyaniYop(true);
+        }
+        // 403 — to'liq chiqish; 401 (noto'g'ri parol/PIN) va 429 (ko'p xato urinish) — server matni shu oynada, qayta urinish yoki "Chiqish"
+        catch (ApiXatosi e) when (e.Status == 403) { SessiyaniYop(false); }
+        catch (ApiXatosi e) { SessiyaXato = e.Message; SessiyaParol = ""; }
+        finally { SessiyaBand = false; }
+    }
+
+    /// <summary>Boshqa odam kirmoqchi yoki parol esda yo'q — to'liq chiqish (kirish oynasi).</summary>
+    [RelayCommand] private void SessiyaChiq() => SessiyaniYop(false);
+
+    [RelayCommand]
+    private void SessiyaRaqam(string r)
+    {
+        if (r == "⌫") { if (SessiyaParol.Length > 0) SessiyaParol = SessiyaParol[..^1]; return; }
+        if (SessiyaParol.Length < 6) SessiyaParol += r;
+    }
 }

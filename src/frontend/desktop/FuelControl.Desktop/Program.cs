@@ -16,7 +16,9 @@ sealed class Program
         System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = uz;
         System.Threading.Thread.CurrentThread.CurrentCulture = uz;
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        Services.XatoJurnali.JarayonniUlash();
+        try { BuildAvaloniaApp().StartWithClassicDesktopLifetime(args); }
+        catch (Exception e) { Services.XatoJurnali.Yoz("Main (dastur yopildi)", e); throw; }
     }
 
     public static AppBuilder BuildAvaloniaApp()

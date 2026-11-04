@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject, effect } from '@angular/core';
+import { Injectable, signal, computed, inject, effect, untracked } from '@angular/core';
 import type { HubConnection } from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { Auth } from './auth';
@@ -35,6 +35,11 @@ export class Aloqa {
     addEventListener('online', () => { this.onlayn.set(true); this.tiklandi$.next(); this.boshla(); });
     addEventListener('offline', () => this.onlayn.set(false));
     effect(() => (this.auth.kirganmi() ? this.boshla() : this.toxta()));
+    // Token almashganda (fon uzaytirish yoki "Sessiya tugadi" oynasidan qayta kirish): hub uzilgan bo'lsa 10 soniya kutmasdan yangi token bilan ulanamiz.
+    effect(() => {
+      const token = this.auth.sessiya()?.token;
+      untracked(() => { if (token && this.hub && this.hubHolati() === 'uzilgan') this.boshla(); });
+    });
   }
 
   private async boshla() {

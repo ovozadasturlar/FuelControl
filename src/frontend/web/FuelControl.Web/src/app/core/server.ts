@@ -16,6 +16,8 @@ export class Server {
   // ---- Kirish
   kirish(login: string, parol: string): Promise<LoginJavobi> { return ol(api.POST('/auth/login', { body: { login, parolYokiPin: parol } })); }
   men(): Promise<FoydalanuvchiDto> { return ol(api.GET('/me')); }
+  /** Faol foydalanuvchi sessiyasini uzaytiradi (docs §8.18): amaldagi token bilan yangi token va muddat, xuddi login kabi. */
+  authYangila(): Promise<LoginJavobi> { return ol(api.POST('/auth/yangila')); }
 
   // ---- Smena
   async joriySmena(): Promise<SmenaTafsilotDto | null> { return (await ol(api.GET('/smenalar/joriy'))) ?? null; }

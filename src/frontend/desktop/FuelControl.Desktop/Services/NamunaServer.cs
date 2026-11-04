@@ -166,6 +166,16 @@ public sealed class NamunaServer : INamunaServer
 
     private static ApiXatosi Xato(string matn, int status = 400) => new(matn, status);
 
+    // ---- §8.18 sinov boshqaruvi
+    /// <summary>Beriladigan token umri (sinovda qisqa).</summary>
+    public TimeSpan TokenUmri { get; set; } = TimeSpan.FromHours(12);
+    /// <summary>true — token muddati tugagandek: login'dan boshqa hamma so'rov 401 (login qaytadan ochadi).</summary>
+    public bool SessiyaTugagan { get; set; }
+    public int Yangilashlar { get; private set; }
+    public int Kirishlar { get; private set; }
+    public int Sorovlar { get; private set; }
+    private int _tokenRaqami;
+
     public object? Javob(HttpMethod usul, string yol, object? tana)
     {
         var q = Sorov(yol);
@@ -173,13 +183,22 @@ public sealed class NamunaServer : INamunaServer
         var s = y.Split('/');
         var get = usul == HttpMethod.Get;
 
+        Sorovlar++;
+        // §8.18 sinovi: sessiya tugagan bo'lsa login'dan boshqa hamma so'rov 401
+        if (SessiyaTugagan && !(s[0] == "auth" && s.Length > 1 && s[1] == "login")) throw Xato("Unauthorized", 401);
         switch (s[0])
         {
+            case "auth" when s.Length > 1 && s[1] == "yangila":
+                Yangilashlar++;
+                return new LoginJavobiDto($"namuna-token-{++_tokenRaqami}", ApiMijoz.Soat().Add(TokenUmri), _foydalanuvchilar.First(x => x.Id == _joriyFoydalanuvchi));
             case "auth":
-                var login = ((LoginSoroviDto)tana!).Login;
-                var f = _foydalanuvchilar.FirstOrDefault(x => x.Login == login) ?? throw Xato("Login yoki parol noto'g'ri", 400);
+                var ls = (LoginSoroviDto)tana!;
+                var f = _foydalanuvchilar.FirstOrDefault(x => x.Login == ls.Login) ?? throw Xato("Login yoki parol noto'g'ri", 401);
+                if (ls.ParolYokiPin == "xato") throw Xato("Login yoki parol noto'g'ri.", 401);   // sinov: noto'g'ri parol
                 _joriyFoydalanuvchi = f.Id;
-                return new LoginJavobiDto("namuna-token", DateTime.UtcNow.AddHours(12), f);
+                SessiyaTugagan = false;
+                Kirishlar++;
+                return new LoginJavobiDto($"namuna-token-{++_tokenRaqami}", ApiMijoz.Soat().Add(TokenUmri), f);
             case "me":
                 return _foydalanuvchilar.First(x => x.Id == _joriyFoydalanuvchi);
             case "foydalanuvchilar" when get:

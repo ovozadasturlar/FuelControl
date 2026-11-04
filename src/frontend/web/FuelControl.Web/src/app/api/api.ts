@@ -10,24 +10,49 @@ export class ApiXato extends Error {
 /** Tarmoq xatosi (internet yo'q / server javob bermadi). */
 export class AloqaXato extends Error {}
 
-let tokenOl: () => string | null = () => null;
-let ruxsatsiz: () => void = () => {};
-
-/** Auth xizmati o'zini shu yerda ro'yxatdan o'tkazadi (aylanma bog'liqlikdan qochish uchun). */
-export function apiSozla(token: () => string | null, chiqar: () => void) {
-  tokenOl = token;
-  ruxsatsiz = chiqar;
+/** Auth xizmati API klientiga ulanadigan kancha (aylanma bog'liqlikdan qochish uchun u o'zini shu yerda ro'yxatdan o'tkazadi). */
+export interface ApiKancha {
+  token: () => string | null;
+  /** Har so'rovdan oldin: faollik belgilanadi, token muddati tugab borayotgan bo'lsa fonda uzaytiriladi (kutilmaydi). */
+  oldin: () => void;
+  /**
+   * 401 keldi (docs §8.18): kirish sahifasiga otmaymiz — joriy ekran ustida parol/PIN so'raladi. `ishlatilgan` — rad etilgan so'rovdagi token.
+   * Qayta kirilsa yangi token, to'liq chiqilsa `null`. Bir vaqtda ko'p so'rov 401 olsa — hammasi bitta javobni kutadi.
+   */
+  tugadi: (ishlatilgan: string | null) => Promise<string | null>;
 }
+
+let kancha: ApiKancha = { token: () => null, oldin: () => {}, tugadi: async () => null };
+
+export function apiSozla(k: ApiKancha) {
+  kancha = k;
+}
+
+/** Kirish va uzaytirish so'rovlariga token/401 qoidalari qo'llanmaydi. */
+const kirishYoli = (url: string) => /\/auth\/(login|yangila)$/.test(new URL(url).pathname);
+
+/** Rad etilgan so'rovni qayta yuborish uchun asl nusxa (tanasi fetch tomonidan o'qib bo'linadi, shuning uchun oldindan clone). */
+const nusxalar = new WeakMap<Request, Request>();
 
 const auth: Middleware = {
   onRequest({ request }) {
-    const t = tokenOl();
+    const t = kancha.token();
     if (t) request.headers.set('Authorization', `Bearer ${t}`);
+    if (!kirishYoli(request.url)) {
+      kancha.oldin();
+      nusxalar.set(request, request.clone());
+    }
     return request;
   },
-  onResponse({ response, request }) {
-    if (response.status === 401 && !request.url.endsWith('/auth/login')) ruxsatsiz();
-    return response;
+  async onResponse({ response, request }) {
+    if (response.status !== 401 || kirishYoli(request.url)) return response;
+    const yangi = await kancha.tugadi(request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? null);
+    const asl = nusxalar.get(request);
+    if (!yangi || !asl) return response;
+    // Parol/PIN qayta kiritildi: rad etilgan so'rov yangi token bilan BIR marta qayta yuboriladi (yana 401 bo'lsa, o'sha javob qaytadi).
+    const q = asl.clone();
+    q.headers.set('Authorization', `Bearer ${yangi}`);
+    return fetch(q);
   },
 };
 

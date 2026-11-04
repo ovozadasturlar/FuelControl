@@ -101,7 +101,39 @@ public static class Malumot
     {
         var m = new ApiMijoz(manzil);
         m.SessiyaTugadi += () => Dispatcher.UIThread.Post(() => MajburiyChiqish?.Invoke(Til.T("SessiyaTugadi")));
+        // §8.18: 401 — kirish oynasiga otilmaydi, joriy ekran ustida parol/PIN so'raladi (MainViewModel)
+        // Uzaytirilgan token bilan rol va ruxsatlar bazadan keladi — /me orqali joyida yangilanadi
+        m.TokenYangilandi += () => Dispatcher.UIThread.Post(() => { if (_kirilgan) Rejala(Bolim.Foydalanuvchilar); });
+        m.QaytaKirishSorovi = () => Dispatcher.UIThread.InvokeAsync(() => QaytaKirishSorovi?.Invoke() ?? Task.FromResult(false));
         return m;
+    }
+
+    // ================= §8.18 Sessiya: uzaytirish va qayta kirish =================
+
+    /// <summary>UI: "Sessiya tugadi" oynasi. true — qayta kirildi, false — to'liq chiqish.</summary>
+    public static Func<Task<bool>>? QaytaKirishSorovi { get; set; }
+
+    /// <summary>Fon tekshiruvi oralig'i (sinovda qisqartiriladi).</summary>
+    public static TimeSpan YangilashTekshiruvi { get; set; } = TimeSpan.FromMinutes(10);
+    private static int _sessiyaVersiyasi;
+
+    /// <summary>Har 10 daqiqada: muddat oz qolgan va foydalanuvchi faol bo'lsa token uzaytiriladi (Task.Delay — DispatcherTimer emas).</summary>
+    private static async Task YangilashSikli(int v)
+    {
+        while (_kirilgan && v == _sessiyaVersiyasi)
+        {
+            await Task.Delay(YangilashTekshiruvi);
+            if (!_kirilgan || v != _sessiyaVersiyasi) return;
+            try { await Api.YangilaKerakBolsa(); } catch (Exception) { /* keyingi tekshiruvda */ }
+        }
+    }
+
+    /// <summary>Sessiya tugaganda shu foydalanuvchi bilan qayta kirish (login o'zgarmaydi). Ma'lumot va ochiq oynalar o'z joyida qoladi.</summary>
+    public static async Task QaytaKir(string parolYokiPin)
+    {
+        await Api.Kirish(JoriyFoydalanuvchi.Login, parolYokiPin);
+        // Token tugagan paytda o'tkazib yuborilgan o'zgarishlar — fonda yangilanadi
+        Rejala(Bolim.Hammasi);
     }
 
     // ================= Kirish / chiqish =================
@@ -117,6 +149,7 @@ public static class Malumot
         Tozala();
         JoriyFoydalanuvchi = Yarat(javob.Foydalanuvchi);
         _kirilgan = true;
+        _ = YangilashSikli(++_sessiyaVersiyasi);
         try
         {
             await Yukla(Bolim.Hammasi);
@@ -135,6 +168,7 @@ public static class Malumot
     public static async Task Chiqish()
     {
         _kirilgan = false;
+        _sessiyaVersiyasi++;   // uzaytirish sikli to'xtaydi
         _rejaVersiyasi++;   // rejadagi yuklash bekor
         _kutilayotgan = 0;
         var hub = _hub;
@@ -258,6 +292,7 @@ public static class Malumot
     /// <summary>Yozuvchi amaldan keyin qo'shimcha yangilash — xato bo'lsa jim (keyingi SignalR xabari yoki qayta ulanish to'g'rilaydi).</summary>
     private static async Task JimYukla(Bolim b)
     {
+        ApiMijoz.FonBelgila();   // SignalR/rejali qayta yuklash — foydalanuvchi faolligi emas (§8.18)
         try { await Yukla(b); }
         catch (ApiXatosi) { }
     }

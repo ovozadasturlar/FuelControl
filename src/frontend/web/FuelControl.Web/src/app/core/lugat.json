@@ -824,6 +824,26 @@
   "Папкани очиш",
   "Открыть папку"
  ],
+ "Sessiya_Sarlavha": [
+  "Sessiya tugadi — parol/PIN ni qayta kiriting",
+  "Сессия тугади — парол/PIN ни қайта киритинг",
+  "Сессия истекла — введите пароль/PIN ещё раз"
+ ],
+ "Sessiya_IzohParol": [
+  "{0} ({1}), davom etish uchun parolni qayta kiriting. Ochiq oynalardagi ma'lumot saqlanadi.",
+  "{0} ({1}), давом этиш учун паролни қайта киритинг. Очиқ ойналардаги маълумот сақланади.",
+  "{0} ({1}), чтобы продолжить, введите пароль ещё раз. Данные в открытых окнах сохранятся."
+ ],
+ "Sessiya_IzohPin": [
+  "{0} ({1}), davom etish uchun PIN ni qayta kiriting. Ochiq oynalardagi ma'lumot saqlanadi.",
+  "{0} ({1}), давом этиш учун PIN ни қайта киритинг. Очиқ ойналардаги маълумот сақланади.",
+  "{0} ({1}), чтобы продолжить, введите PIN ещё раз. Данные в открытых окнах сохранятся."
+ ],
+ "Xato_Kutilmagan": [
+  "Kutilmagan xato yuz berdi, dastur ishlashda davom etadi. Takrorlansa, administratorga xabar bering. Tafsilot: {0}",
+  "Кутилмаган хато юз берди, дастур ишлашда давом этади. Такрорланса, администраторга хабар беринг. Тафсилот: {0}",
+  "Произошла непредвиденная ошибка, программа продолжает работу. Если повторится, сообщите администратору. Подробности: {0}"
+ ],
  "Zaxira_Papka": [
   "Zaxira papkasi",
   "Захира папкаси",

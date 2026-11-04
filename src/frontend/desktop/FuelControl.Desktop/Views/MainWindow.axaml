@@ -210,6 +210,58 @@
         <!-- ============ Kirish ============ -->
         <v:LoginView DataContext="{Binding Login}" IsVisible="{Binding !$parent[Window].((vm:MainViewModel)DataContext).Kirilgan}" />
 
+        <!-- ============ §8.18 Sessiya tugadi: joriy ekran va ochiq dialog ustida, faqat parol/PIN ============ -->
+        <Border x:Name="SessiyaParda" Classes="parda" IsVisible="{Binding SessiyaOchiq}">
+            <Border Classes="dialog" Width="440">
+                <ScrollViewer Classes="dialogIchi" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="14">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border Width="38" Height="38" CornerRadius="19" Background="{DynamicResource BadgeSariqFon}">
+                            <ctl:Ikon Nomi="alert" Olcham="18" Rang="{DynamicResource BadgeSariqMatn}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Classes="sarlavha" FontSize="19" Text="{Binding SessiyaSarlavha}" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="330" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding SessiyaIzoh}" TextWrapping="Wrap" FontSize="13.5" Foreground="{DynamicResource MatnIkkilamchi}" />
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding SessiyaYorliq}" Classes="yorliq" Margin="0" />
+                        <TextBox x:Name="SessiyaMaydon" Text="{Binding SessiyaParol}" PasswordChar="●" MinHeight="46" CornerRadius="23"
+                                 PlaceholderText="{l:T PinYokiParol}" ctl:AvtoFokus.Yoqilgan="True">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding SessiyaKirCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                    </StackPanel>
+                    <UniformGrid Columns="3" Rows="4" ColumnSpacing="8" RowSpacing="8" IsVisible="{Binding SessiyaPin}">
+                        <UniformGrid.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="Height" Value="46" />
+                                <Setter Property="FontSize" Value="18" />
+                                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                            </Style>
+                        </UniformGrid.Styles>
+                        <Button Content="1" Command="{Binding SessiyaRaqamCommand}" CommandParameter="1" />
+                        <Button Content="2" Command="{Binding SessiyaRaqamCommand}" CommandParameter="2" />
+                        <Button Content="3" Command="{Binding SessiyaRaqamCommand}" CommandParameter="3" />
+                        <Button Content="4" Command="{Binding SessiyaRaqamCommand}" CommandParameter="4" />
+                        <Button Content="5" Command="{Binding SessiyaRaqamCommand}" CommandParameter="5" />
+                        <Button Content="6" Command="{Binding SessiyaRaqamCommand}" CommandParameter="6" />
+                        <Button Content="7" Command="{Binding SessiyaRaqamCommand}" CommandParameter="7" />
+                        <Button Content="8" Command="{Binding SessiyaRaqamCommand}" CommandParameter="8" />
+                        <Button Content="9" Command="{Binding SessiyaRaqamCommand}" CommandParameter="9" />
+                        <Border />
+                        <Button Content="0" Command="{Binding SessiyaRaqamCommand}" CommandParameter="0" />
+                        <Button Command="{Binding SessiyaRaqamCommand}" CommandParameter="⌫"><ctl:Ikon Nomi="backspace" Olcham="18" /></Button>
+                    </UniformGrid>
+                    <TextBlock Text="{Binding SessiyaXato}" Classes="xatoMatn" IsVisible="{Binding SessiyaXato, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,0,0,6">
+                        <Button x:Name="SessiyaChiqTugma" Classes="ghost" Content="{l:T Chiqish}" Command="{Binding SessiyaChiqCommand}" />
+                        <Button x:Name="SessiyaKirTugma" Grid.Column="2" Classes="primary" MinWidth="130" Content="{l:T Kirish}" Command="{Binding SessiyaKirCommand}" />
+                    </Grid>
+                </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Border>
+
         <!-- ============ Umumiy xabar (xato / ma'lumot) — eng ustida ============ -->
         <Border Classes="parda" IsVisible="{Binding BildirishOchiq}">
             <Border Classes="dialog" Width="460">

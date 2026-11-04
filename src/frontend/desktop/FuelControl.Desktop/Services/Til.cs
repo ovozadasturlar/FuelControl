@@ -240,6 +240,11 @@ public sealed class Til : INotifyPropertyChanged
         ["HozirNusxa"] = ("Hozir nusxa olish", "Ҳозир нусха олиш", "Создать копию сейчас"),
         ["NusxadanTiklash"] = ("Nusxadan tiklash…", "Нусхадан тиклаш…", "Восстановить из копии…"),
         ["PapkaniOchish"] = ("Papkani ochish", "Папкани очиш", "Открыть папку"),
+        // §8.18 Sessiya tugadi — qayta kirish
+        ["Sessiya_Sarlavha"] = ("Sessiya tugadi — parol/PIN ni qayta kiriting", "Сессия тугади — парол/PIN ни қайта киритинг", "Сессия истекла — введите пароль/PIN ещё раз"),
+        ["Sessiya_IzohParol"] = ("{0} ({1}), davom etish uchun parolni qayta kiriting. Ochiq oynalardagi ma'lumot saqlanadi.", "{0} ({1}), давом этиш учун паролни қайта киритинг. Очиқ ойналардаги маълумот сақланади.", "{0} ({1}), чтобы продолжить, введите пароль ещё раз. Данные в открытых окнах сохранятся."),
+        ["Sessiya_IzohPin"] = ("{0} ({1}), davom etish uchun PIN ni qayta kiriting. Ochiq oynalardagi ma'lumot saqlanadi.", "{0} ({1}), давом этиш учун PIN ни қайта киритинг. Очиқ ойналардаги маълумот сақланади.", "{0} ({1}), чтобы продолжить, введите PIN ещё раз. Данные в открытых окнах сохранятся."),
+        ["Xato_Kutilmagan"] = ("Kutilmagan xato yuz berdi, dastur ishlashda davom etadi. Takrorlansa, administratorga xabar bering. Tafsilot: {0}", "Кутилмаган хато юз берди, дастур ишлашда давом этади. Такрорланса, администраторга хабар беринг. Тафсилот: {0}", "Произошла непредвиденная ошибка, программа продолжает работу. Если повторится, сообщите администратору. Подробности: {0}"),
         // §8.17 Sozlamalar → Zaxira nusxa
         ["Zaxira_Papka"] = ("Zaxira papkasi", "Захира папкаси", "Папка резервных копий"),
         ["Zaxira_PapkaStandart"] = ("Sozlangan papka ({0}) topilmadi yoki unga yozib bo'lmadi — nusxalar standart papkaga olinmoqda", "Созланган папка ({0}) топилмади ёки унга ёзиб бўлмади — нусхалар стандарт папкага олинмоқда", "Настроенная папка ({0}) не найдена или недоступна для записи — копии сохраняются в стандартную папку"),

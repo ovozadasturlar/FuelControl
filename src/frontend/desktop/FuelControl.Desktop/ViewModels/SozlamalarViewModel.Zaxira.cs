@@ -178,6 +178,7 @@ public partial class SozlamalarViewModel
 
     private async Task KechiktibYukla()
     {
+        ApiMijoz.FonBelgila();
         await Task.Delay(5000);
         await ZaxiraniYukla();
     }

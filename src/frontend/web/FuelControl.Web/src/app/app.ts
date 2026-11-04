@@ -7,6 +7,7 @@ import { Til } from './core/til';
 import { Tema } from './core/tema';
 import { Ornatish } from './core/ornatish';
 import { Ikon } from './ui/ikon';
+import { SessiyaTugadi } from './ui/sessiya-tugadi';
 
 const AVTO_KALIT = 'fc.avtoYangilandi';
 /** Ilova ochilgandan shuncha vaqt ichida yangi versiya topilsa — darhol (foydalanuvchi hali hech narsa kiritmagan) almashtiriladi. */
@@ -16,9 +17,10 @@ const TEKSHIRISH_ORALIGI_MS = 10 * 60 * 1000;
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Ikon],
+  imports: [RouterOutlet, Ikon, SessiyaTugadi],
   template: `
     <router-outlet />
+    <sessiya-tugadi />
     @if (bildirish.joriy(); as x) {
       <div class="bildirish shisha" [class.xato]="x.xato" role="status" aria-live="polite">
         <ikon [nomi]="x.xato ? 'x' : 'check'" [olcham]="16" [qalinlik]="2.2" /> {{ x.matn }}

@@ -50,21 +50,102 @@ public sealed class ApiMijoz
     /// <summary>O'rnatilsa — barcha so'rovlarga server o'rniga shu javob beradi (namuna rejimi).</summary>
     public static INamunaServer? Namuna { get; set; }
 
-    /// <summary>Token muddati tugagan yoki bekor qilingan (401) — qayta kirish kerak.</summary>
+    /// <summary>Sessiyani davom ettirib bo'lmaydi (qayta kirish rad etildi, foydalanuvchi nofaol/bloklangan) — to'liq chiqish kerak.</summary>
     public event Action? SessiyaTugadi;
+
+    // ---------- §8.18: token muddati, fon rejimida uzaytirish, 401 da qayta kirish ----------
+    /// <summary>Sinov uchun almashtiriladi (soat siljitish). UTC.</summary>
+    public static Func<DateTime> Soat { get; set; } = () => DateTime.UtcNow;
+    /// <summary>Muddatgacha min(shu, token umrining yarmi) dan kam qolsa (va foydalanuvchi faol bo'lsa) token uzaytiriladi.</summary>
+    public static TimeSpan YangilashChegarasi { get; set; } = TimeSpan.FromHours(6);
+    private DateTime _berilgan;
+    /// <summary>Oxirgi API so'rovi yoki klaviatura/sichqoncha harakati shu oraliqda bo'lsa — foydalanuvchi faol.</summary>
+    public static TimeSpan FaollikOynasi { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>Server bergan muddat (UTC).</summary>
+    public DateTime? TokenMuddati { get; private set; }
+    private DateTime _oxirgiFaollik = DateTime.MinValue;
+    private Task? _yangilash;
+    private Task<bool>? _qaytaKirish;
+
+    /// <summary>401: joriy ekran ustida parol/PIN so'raladi. true — qayta kirildi (so'rov bir marta qayta yuboriladi), false — to'liq chiqish.</summary>
+    public Func<Task<bool>>? QaytaKirishSorovi { get; set; }
+
+    /// <summary>Token almashdi (uzaytirildi yoki qayta kirildi).</summary>
+    public event Action? TokenYangilandi;
+
+    public void FaollikBelgila() => _oxirgiFaollik = Soat();
+
+    /// <summary>
+    /// Fon so'rovlari (SignalR keltirgan qayta yuklash, taymerlar) faollik hisoblanmaydi — ochiq qoldirilgan kompyuterda token 12 soatda tugaydi.
+    /// AsyncLocal: belgilagan async metod va u kutgan chaqiruvlar uchun amal qiladi, chaqiruvchiga qaytmaydi.
+    /// </summary>
+    private static readonly System.Threading.AsyncLocal<bool> Fon = new();
+    public static void FonBelgila() => Fon.Value = true;
+
+    private void TokenniQoy(LoginJavobiDto j)
+    {
+        Token = j.Token;
+        _berilgan = Soat();
+        TokenMuddati = j.TokenMuddati.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(j.TokenMuddati, DateTimeKind.Utc) : j.TokenMuddati.ToUniversalTime();
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+    }
+
+    /// <summary>Muddati o'tmagan, lekin oz qolgan va foydalanuvchi faol. O'tib ketgan token uzaytirilmaydi — u 401 bilan qayta kirishga o'tadi.</summary>
+    public bool YangilashKerak
+    {
+        get
+        {
+            if (Token is null || TokenMuddati is not { } m || _qaytaKirish is not null) return false;
+            var hozir = Soat();
+            var yarmi = (m - _berilgan) / 2;
+            var chegara = yarmi < YangilashChegarasi ? yarmi : YangilashChegarasi;   // qisqa (sinov) tokenda ham ishlaydi
+            return m > hozir && m - hozir < chegara && hozir - _oxirgiFaollik < FaollikOynasi;
+        }
+    }
+
+    /// <summary>Kerak bo'lsa fon rejimida /auth/yangila; bir vaqtda bittasi. Aloqa xatosida jim (keyingi tekshiruvda qayta urinadi).</summary>
+    public Task YangilaKerakBolsa() => YangilashKerak ? _yangilash ??= Yangila() : Task.CompletedTask;
+
+    private async Task Yangila()
+    {
+        try
+        {
+            var j = await Yubor<LoginJavobiDto>(HttpMethod.Post, "auth/yangila", null, ichki: true);
+            if (j is not null) { TokenniQoy(j); TokenYangilandi?.Invoke(); }
+        }
+        catch (ApiXatosi e) when (e.Status is 401 or 403) { SessiyaTugadi?.Invoke(); }   // nofaol yoki bloklangan — to'liq chiqish
+        catch (ApiXatosi) { }
+        finally { _yangilash = null; }
+    }
+
+    /// <summary>Bir nechta so'rov bir vaqtda 401 olsa ham parol bir marta so'raladi.</summary>
+    private Task<bool> QaytaKirishKut()
+    {
+        if (QaytaKirishSorovi is not { } sorov) return Task.FromResult(false);
+        return _qaytaKirish ??= Kut();
+        async Task<bool> Kut()
+        {
+            try { return await sorov(); }
+            finally { _qaytaKirish = null; }
+        }
+    }
 
     // ---------- Auth ----------
     public async Task<LoginJavobiDto> Kirish(string login, string parolYokiPin)
     {
-        var javob = await Yubor<LoginJavobiDto>(HttpMethod.Post, "auth/login", new LoginSoroviDto(login, parolYokiPin), tokenli: false);
-        Token = javob!.Token;
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        var javob = await Yubor<LoginJavobiDto>(HttpMethod.Post, "auth/login", new LoginSoroviDto(login, parolYokiPin), tokenli: false)
+                    ?? throw new ApiXatosi(Til.F("ServerXatosi", 200), 200);
+        TokenniQoy(javob);
+        FaollikBelgila();
+        TokenYangilandi?.Invoke();
         return javob;
     }
 
     public void Chiqish()
     {
         Token = null;
+        TokenMuddati = null;
         _http.DefaultRequestHeaders.Authorization = null;
     }
 
@@ -157,13 +238,42 @@ public sealed class ApiMijoz
 
     private Task<T?> Ol<T>(string yol) => Yubor<T>(HttpMethod.Get, yol, null);
 
-    private async Task<T?> Yubor<T>(HttpMethod usul, string yol, object? tana, bool tokenli = true)
+    /// <summary>
+    /// tokenli — 401 qayta kirishga olib boradi. ichki — /auth/yangila: faollik belgilanmaydi, uzaytirish tekshirilmaydi, 401 chaqiruvchiga qaytadi.
+    /// 401 da (oddiy so'rov): parol/PIN so'raladi va so'rov bir marta qayta yuboriladi; rad etilsa — SessiyaTugadi.
+    /// </summary>
+    private async Task<T?> Yubor<T>(HttpMethod usul, string yol, object? tana, bool tokenli = true, bool ichki = false)
+    {
+        if (tokenli && !ichki)
+        {
+            if (!Fon.Value) FaollikBelgila();   // faqat foydalanuvchi boshlagan so'rov
+            await YangilaKerakBolsa();
+        }
+        for (var urinish = 0; ; urinish++)
+        {
+            var yuborilganToken = Token;
+            try
+            {
+                return await BirMarta<T>(usul, yol, tana);
+            }
+            catch (ApiXatosi e) when (e.Status == 401 && tokenli && !ichki)
+            {
+                // Boshqa so'rov orqali token allaqachon yangilangan — so'ramasdan qayta yuboriladi
+                if (urinish == 0 && Token is not null && Token != yuborilganToken) continue;
+                if (urinish == 0 && await QaytaKirishKut()) continue;
+                SessiyaTugadi?.Invoke();
+                throw new ApiXatosi(Til.T("SessiyaTugadi"), 401);
+            }
+        }
+    }
+
+    private async Task<T?> BirMarta<T>(HttpMethod usul, string yol, object? tana)
     {
         if (Namuna is { } n)
         {
             await Task.Yield();
             var j = n.Javob(usul, yol, tana);
-            if (usul == HttpMethod.Post && yol == "auth/login" && j is LoginJavobiDto lj) Token = lj.Token;
+            if (usul == HttpMethod.Post && yol is "auth/login" or "auth/yangila" && j is LoginJavobiDto lj) TokenniQoy(lj);
             return j is T t ? t : default;
         }
 
@@ -188,11 +298,9 @@ public sealed class ApiMijoz
                 return await javob.Content.ReadFromJsonAsync<T>(Json);
             }
 
-            if (javob.StatusCode == HttpStatusCode.Unauthorized && tokenli)
-            {
-                SessiyaTugadi?.Invoke();
+            // Login (tokensiz) 401 — server matni bilan oddiy xato; boshqalari — Yubor qayta kirishni hal qiladi
+            if (javob.StatusCode == HttpStatusCode.Unauthorized && yol != "auth/login")
                 throw new ApiXatosi(Til.T("SessiyaTugadi"), 401);
-            }
 
             string xabar;
             int[]? kerakli = null;
